@@ -53,7 +53,7 @@ class EvalDataset(BaseModel):
             with open(filename, "w") as f:
                 json.dump(data, f, indent=4) 
 
-        return json.dumps(data, indent=4)
+        return data
     
     
 if __name__ == '__main__':
