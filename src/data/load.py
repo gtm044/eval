@@ -1,10 +1,5 @@
 # src/data/load.py
 
-# Req:
-# - LoadOptions containing the cluster config
-# - LoadOperator that loads the data into the couchbase cluster. Takes in the EvalDataset class and the LoadOptions
-# - LoadOperator should have a method that retrieves the data from the cluster and outputs n EvalDataset class.
-
 from typing import List, Optional
 from datetime import timedelta
 from datetime import datetime
