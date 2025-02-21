@@ -3,7 +3,7 @@ Framework to evaluate RAG systems and synthesize ground truth data.
 
 ## Roadmap
 - `EvalDataset` data class - Done
-    - Input:  Questions, Ground truth answers, Reference Contexts, Retrieved Contexts, Generated Responses.
+    - Input:  Questions, Ground truth answers, Reference Contexts, Retrieved Contexts, Generated Responses (or subset of these fields)
     - Ingest from python lists/dictionaries.
 
 - Operator to load the ground truth data into a key value store. - Done
@@ -24,4 +24,3 @@ Framework to evaluate RAG systems and synthesize ground truth data.
     - Unstructured Formats: PDFs
     - Logs: ?
     - File metadata can be provided as the document description.
-    - 

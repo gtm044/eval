@@ -176,9 +176,9 @@ class LoadOperator:
     
 if __name__ == '__main__':
     data = {
-        # "questions": ["What is the capital of France?", "Who is the president of the USA?"],
-        # "answers": ["Paris", "Joe Biden"],
-        # "responses": ["Paris", "Joe Biden"],
+        "questions": ["What is the capital of France?", "Who is the president of the USA?"],
+        "answers": ["Paris", "Joe Biden"],
+        "responses": ["Paris", "Joe Biden"],
         "reference_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"],
         "retrieved_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"]
     }
