@@ -6,6 +6,7 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 import uuid
+import json
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
@@ -105,13 +106,21 @@ class LoadOperator:
             for r in result.results.values():
                 content.append(r.value)
         
-        return EvalDataset(**{
-            "questions": [c["question"] for c in content],
-            "answers": [c["answer"] for c in content],
-            "responses": [c["response"] for c in content],
-            "reference_contexts": [c["reference_context"] for c in content],
-            "retrieved_contexts": [c["retrieved_context"] for c in content]
-        })
+        ## Create the EvalDataset object with only those fields that has a value not None
+        output_dict = {}
+        if content[0]["question"]:
+            output_dict["questions"] = [c["question"] for c in content]
+        if content[0]["answer"]:
+            output_dict["answers"] = [c["answer"] for c in content]
+        if content[0]["response"]:
+            output_dict["responses"] = [c["response"] for c in content]
+        if content[0]["reference_context"]:
+            output_dict["reference_contexts"] = [c["reference_context"] for c in content]
+        if content[0]["retrieved_context"]:    
+            output_dict["retrieved_contexts"] = [c["retrieved_context"] for c in content]
+        
+        
+        return EvalDataset(**output_dict)
         
         
 
@@ -167,13 +176,14 @@ class LoadOperator:
     
 if __name__ == '__main__':
     data = {
-        "questions": ["What is the capital of France?", "Who is the president of the USA?"],
-        "answers": ["Paris", "Joe Biden"],
-        "responses": ["Paris", "Joe Biden"],
+        # "questions": ["What is the capital of France?", "Who is the president of the USA?"],
+        # "answers": ["Paris", "Joe Biden"],
+        # "responses": ["Paris", "Joe Biden"],
         "reference_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"],
         "retrieved_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"]
     }
     dataset = EvalDataset(**data)
+    dataset.to_json("test.json")
     loader = LoadOperator(data=dataset, dataset_description="Test dataset")
     loader.load_docs()
     print(loader.dataset_id)
