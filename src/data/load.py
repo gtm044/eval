@@ -1,5 +1,4 @@
 # src/data/load.py
-
 from typing import List, Optional
 from datetime import timedelta
 from datetime import datetime
@@ -172,7 +171,6 @@ class LoadOperator:
             
         return cb        
 
-    
     
 if __name__ == '__main__':
     data = {

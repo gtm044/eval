@@ -1,0 +1,16 @@
+[
+    {
+        "question": "What is the capital of France?",
+        "answer": "Paris",
+        "response": "Paris",
+        "reference_context": "Paris is the capital of France",
+        "retrieved_context": "Paris is the capital of France"
+    },
+    {
+        "question": "Who is the president of the USA?",
+        "answer": "Joe Biden",
+        "response": "Joe Biden",
+        "reference_context": "Joe Biden is the president of the USA",
+        "retrieved_context": "Joe Biden is the president of the USA"
+    }
+]
