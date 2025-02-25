@@ -59,12 +59,16 @@ Framework to evaluate RAG systems and synthesize ground truth data.
     - Tables: Compilcated, each chunk can be a single row or a set of rows. For retrieveal evaluation, can just match the rows as it is, again binary classicfication metrics. For responses, compare the ground truth and the reference answers, simiarity measures bw the generated response and the retrived document wont work for tables.
     - For synthesizing ground truths for tables, simple prompt engineering is enough, with the serialized json of the table/required row given as the input.
 
-- Chunking metrics:
+- Chunking metrics - Done:
     - How to interpret each chunk? Tokenize? Splitting into words doesn't make sense. If we tokenize, will the reference chunks and the generated chunks ever contain the same tokens?
     - Average chunk size: Tokenize each chunk, find the average of all the chunks. Lets say there are 10 documents (10 chunks), find the length of the tokens of each document, get the average.
     - For IoU(Jaccard Index), we need the relevant and the retrieved chunks, how would a user get the relevant chunks?  
     - For the avg_chunk_size, we need a threshold to determine the chunk size that is admissible. User defined or programmed?
     - Use a normalized parabolic function to get an index value for the average chunk size.
+
+- Retrieval metrics:
+    - For contet scores, ROUGE scores can be either written from scratch, or loaded from the hugggingface evaluate library.
+
 
 - Ingesting raw data to synthesize ground truth:
     - Structured Formats: CSV, JSON (How to infer schema?), Parquet.

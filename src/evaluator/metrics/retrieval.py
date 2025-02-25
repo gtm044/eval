@@ -7,30 +7,10 @@
 # - Named Entity Match
 # - Keyword Overlap Score
 
-from openai import OpenAI
+from src.utils.models import openai_embedding
+from src.utils.nlp import cosine_similarity, n_gram, rouge_n, rouge_l
+import argparse
 import numpy as np
-
-def get_embedding(text):
-    """
-    Get the embedding of the text using the OpenAI API.
-    """
-    openai = OpenAI()
-    response = openai.embeddings.create(
-        input = text,
-        model = "text-embedding-3-small"
-    )
-    return response.data[0].embedding
-
-def cosine_similarity(vec_A, vec_B):
-    """
-    Calculate the cosine similarity between two vectors.
-    """
-    dot_product = np.dot(vec_A, vec_B)
-    magnitude_A = np.linalg.norm(vec_A)
-    magnitude_B = np.linalg.norm(vec_B)
-
-    cosine_similarity = dot_product / (magnitude_A * magnitude_B)
-    return cosine_similarity
 
 def embedding_similarity(reference_contexts, retrieved_contexts, method="cosine"):
     """
@@ -39,27 +19,57 @@ def embedding_similarity(reference_contexts, retrieved_contexts, method="cosine"
     similarities = []
     if method=="cosine":
         for reference, retrieved in zip(reference_contexts, retrieved_contexts):
-            ref_embedding = get_embedding(reference)
-            retrieved_embedding = get_embedding(retrieved)
+            ref_embedding = openai_embedding(reference)
+            retrieved_embedding = openai_embedding(retrieved)
             similarity = cosine_similarity(ref_embedding, retrieved_embedding)
-            similarities.append(similarity)
+            similarities.append(round(similarity.item(), 2))
     elif method=="dot":
         for reference, retrieved in zip(reference_contexts, retrieved_contexts):
-            ref_embedding = get_embedding(reference)
-            retrieved_embedding = get_embedding(retrieved)
+            ref_embedding = openai_embedding(reference)
+            retrieved_embedding = openai_embedding(retrieved)
             similarity = np.dot(ref_embedding, retrieved_embedding)
-            similarities.append(similarity)
+            similarities.append(round(similarity.item(), 2))
     return similarities
 
+def context_score(reference_contexts, retrieved_contexts):
+    """
+    Calculates context precision, recall , f1 score between the reference and retrieved contexts.
+    Returns a tuple of (precision, recall, f1 score)
+    """
+    scores = []
+    for reference, retrieved in zip(reference_contexts, retrieved_contexts):
+        # Find the ROUGE precision between the reference and retrieved contexts
+        _rouge_n = rouge_n(retrieved, reference, n=3)
+        _rouge_l = rouge_l(retrieved, reference)
+        rouge_score = [round(_rouge_n, 2), round(_rouge_l, 2)]
+        scores.append(rouge_score)
+    return scores
+        
+
 if __name__=='__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("test", type=str)
+    parser.add_argument("method", type=str)
+    args = parser.parse_args()
     reference_contexts = [
         "This is a test document. It has a few sentences.",
-        "This is another test document. It also has a few sentences.",
-        "My name is Goutham"
+        "This is another test document. It does not have a few sentences.",
+        "I live in Bengaluru"
     ]
     retrieved_contexts = [
         "This is a test document. It has a few sentences.",
         "This is another test document. It also has a few sentences.",
-        "My name is Goutham"
+        "My name is Bob"
     ]
-    print(embedding_similarity(reference_contexts, retrieved_contexts, method="cosine"))
+    if args.test=="embedding_similarity":
+        if args.method=="cosine":
+            print(embedding_similarity(reference_contexts, retrieved_contexts, method="cosine"))
+        elif args.method=="dot":
+            print(embedding_similarity(reference_contexts, retrieved_contexts, method="dot"))
+    
+    if args.test=="context_score":
+        scores = context_score(reference_contexts, retrieved_contexts)
+        print("ROUGE_3, ROUGE_L F1 Scores")
+        print("-------")
+        for i, score in enumerate(scores):
+            print(f"Context pair {i+1}|\tROUGE_3: {score[0]}\tROUGE_L: {score[1]}")

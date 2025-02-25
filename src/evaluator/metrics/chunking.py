@@ -4,9 +4,6 @@
 import tiktoken
 import argparse
 
-def mod(a: int):
-    return a if a >= 0 else -a
-
 def avg_chunk_size(contexts, limit=[3, 15]):
     """
     Calculate the average chunk size of the context documents and return a normalized index.
@@ -22,6 +19,7 @@ def avg_chunk_size(contexts, limit=[3, 15]):
     sizes = round(sizes / len(contexts))
     # Normalized parabolic function
     midpoint = (limit[0] + limit[1]) // 2
+    mod = lambda x: x if x >= 0 else -x
     index = 1-((2*mod(sizes-midpoint))/(limit[1]-limit[0]))
     
     return index
@@ -56,7 +54,7 @@ if __name__ == '__main__':
         contexts = [
             "This is a test document. It has a few sentences.",
             "This is another test document. It also has a few sentences.",
-            "My name is Goutham"
+            "My name is Bob"
         ]    
         print(avg_chunk_size(contexts))
     elif args.test=="jaccard_index":
