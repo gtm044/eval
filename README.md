@@ -18,6 +18,10 @@ Framework to evaluate RAG systems and synthesize ground truth data.
   - Expands documents to create larger datasets.
   - Synthesizing ground truth data from raw documents.
 
+## Notes
+
+- Add a bash to download the spacy corpus on installing the sdk. ``python -m spacy download en_core_web_sm``
+
 
 ## Roadmap
 - `EvalDataset` data class - Done

@@ -1,4 +1,5 @@
 import numpy as np
+import spacy
 from src.utils.algo import lcs
 
 def cosine_similarity(vec_A, vec_B):
@@ -50,3 +51,11 @@ def rouge_l(candidate, reference):
 
     f1_score = (2 * recall * precision) / (recall + precision)
     return f1_score
+
+def ner(text):
+    """
+    Extract named entities from a text.
+    """
+    nlp = spacy.load("en_core_web_md")
+    doc = nlp(text)
+    return {(ent.text, ent.label_) for ent in doc.ents}

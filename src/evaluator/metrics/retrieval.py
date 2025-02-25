@@ -5,26 +5,26 @@
 # - Embedding Similarity
 # - Redundancy
 # - Named Entity Match
-# - Keyword Overlap Score
+# - Accuracy (total )
 
 from src.utils.models import openai_embedding
-from src.utils.nlp import cosine_similarity, n_gram, rouge_n, rouge_l
+from src.utils.nlp import cosine_similarity, rouge_n, rouge_l, ner
 import argparse
 import numpy as np
 
-def embedding_similarity(reference_contexts, retrieved_contexts, method="cosine"):
+def embedding_similarity(questions, retrieved_contexts, method="cosine"):
     """
     Calculates the cosine similarity between reference contexts and the retrieved contexts.
     """
     similarities = []
     if method=="cosine":
-        for reference, retrieved in zip(reference_contexts, retrieved_contexts):
+        for reference, retrieved in zip(questions, retrieved_contexts):
             ref_embedding = openai_embedding(reference)
             retrieved_embedding = openai_embedding(retrieved)
             similarity = cosine_similarity(ref_embedding, retrieved_embedding)
             similarities.append(round(similarity.item(), 2))
     elif method=="dot":
-        for reference, retrieved in zip(reference_contexts, retrieved_contexts):
+        for reference, retrieved in zip(questions, retrieved_contexts):
             ref_embedding = openai_embedding(reference)
             retrieved_embedding = openai_embedding(retrieved)
             similarity = np.dot(ref_embedding, retrieved_embedding)
@@ -44,8 +44,34 @@ def context_score(reference_contexts, retrieved_contexts):
         rouge_score = [round(_rouge_n, 2), round(_rouge_l, 2)]
         scores.append(rouge_score)
     return scores
-        
 
+
+def named_entity_score(question, retrieved_contexts):
+    """
+    Calculate the named entity score between the reference question and the retrieved contexts.
+    """
+    scores = []
+    for question, context in zip(question, retrieved_contexts):
+        question_entities = ner(question)
+        context_entities = ner(context)
+        print(question_entities, context_entities)
+        intersection = len(question_entities.intersection(context_entities))
+        union = len(question_entities.union(context_entities))
+        score = intersection / union # How to convert the intersection to a score? -> Probably get the number of interections/total number of entities in the question * 100?
+        scores.append(round(score, 2))
+    return scores
+
+def accuracy(reference_contexts, retrived_contexts):
+    """
+    Calculate the accuracy of the retrieved contexts.
+    """
+    accuracy = 0
+    for reference, retrieved in zip(reference_contexts, retrived_contexts):
+        if reference == retrieved:
+            accuracy += 1
+    return round(accuracy/len(reference_contexts), 2)
+            
+            
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("test", type=str)
@@ -73,3 +99,12 @@ if __name__=='__main__':
         print("-------")
         for i, score in enumerate(scores):
             print(f"Context pair {i+1}|\tROUGE_3: {score[0]}\tROUGE_L: {score[1]}")
+            
+    if args.test=="named_entity_score":
+        question = ["What is the capital of India?", "What is the capital of France?", "What is the capital of Germany?"]
+        context = ["The capital of India is New Delhi", "The capital of France is Paris", "The capital of Germany is Berlin"]
+        scores = named_entity_score(question, context)
+        print("Named Entity Scores")
+        print("-------")
+        for i, score in enumerate(scores):
+            print(f"Context pair {i+1}|\tNamed Entity Score: {score}")
