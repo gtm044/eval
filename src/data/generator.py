@@ -151,6 +151,7 @@ class SyntheticDataGenerator:
         
     
 if __name__ == '__main__':
+    
     # documents = [
     #     "The quick brown fox jumps over the lazy dog.",
     #     "Paris was invented in 1984",
@@ -158,8 +159,7 @@ if __name__ == '__main__':
     # ]
     
     generator = SyntheticDataGenerator()
-    
-    documents = generator.load_from_json(path="/Users/goutham.krishnan/Documents/Work/eval/src/data/input", field="reference_context")
+    documents = generator.load_from_json(path=os.environ["input_path"], field="reference_context")
     
     # Expand your raw documents
     expanded_documents = generator.expand(documents, limit=3)

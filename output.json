@@ -1,0 +1,46 @@
+[
+    {
+        "question": "What is the capital of France?",
+        "answer": "Paris is the capital of france",
+        "response": "Capital of france is Paris",
+        "reference_context": "Paris is the capital of France",
+        "retrieved_context": "Paris is the capital of France",
+        "avg_chunk_size": 0.6666666666666667,
+        "context_score": [
+            1.0,
+            1.0
+        ],
+        "embedding_similarity": 0.72,
+        "named_entity_score": 0.5,
+        "retrieval_accuracy": 1.0,
+        "bleu_score": 0.72,
+        "rouge_score": [
+            0.0,
+            0.36
+        ],
+        "faithfulness": 100.0,
+        "response_similarity": 0.79
+    },
+    {
+        "question": "Who is the president of the USA?",
+        "answer": "Joe Biden is the president of the USA",
+        "response": "President of the USA is Joe Biden",
+        "reference_context": "Joe Biden is the president of the USA",
+        "retrieved_context": "Joe Biden is the president of the USA",
+        "avg_chunk_size": 0.6666666666666667,
+        "context_score": [
+            1.0,
+            1.0
+        ],
+        "embedding_similarity": 0.73,
+        "named_entity_score": 0.5,
+        "retrieval_accuracy": 1.0,
+        "bleu_score": 0.77,
+        "rouge_score": [
+            0.18,
+            0.4
+        ],
+        "faithfulness": 100.0,
+        "response_similarity": 0.84
+    }
+]

@@ -29,7 +29,7 @@ class ValidationOptions(BaseModel):
     @field_validator("metrics", mode="before")
     def check_metrics(cls, v):
         implemented_metrics = [
-            "avg_chunk_size", "jaccard_index", "context_score", "embedding_similarity", "named_entity_score"
+            "avg_chunk_size", "jaccard_index", "context_score", "embedding_similarity", "named_entity_score", "retrieval_accuracy", "bleu_score", "rouge_score", "faithfulness", "response_similarity"
         ]
         if not isinstance(v, list):
             raise ValueError("Metrics must be a list.")

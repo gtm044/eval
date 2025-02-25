@@ -14,7 +14,7 @@ import numpy as np
 
 def embedding_similarity(questions, retrieved_contexts, method="cosine"):
     """
-    Calculates the cosine similarity between reference contexts and the retrieved contexts.
+    Calculates the embedding similarity between reference contexts and the retrieved contexts.
     """
     similarities = []
     if method=="cosine":
@@ -34,7 +34,7 @@ def embedding_similarity(questions, retrieved_contexts, method="cosine"):
 def context_score(reference_contexts, retrieved_contexts):
     """
     Calculates context precision, recall , f1 score between the reference and retrieved contexts.
-    Returns a tuple of (precision, recall, f1 score)
+    Returns the F1 score for ROUGE-N and ROUGE-L
     """
     scores = []
     for reference, retrieved in zip(reference_contexts, retrieved_contexts):
@@ -61,7 +61,7 @@ def named_entity_score(question, retrieved_contexts):
         scores.append(round(score, 2))
     return scores
 
-def accuracy(reference_contexts, retrived_contexts):
+def retrieval_accuracy(reference_contexts, retrived_contexts):
     """
     Calculate the accuracy of the retrieved contexts.
     """
