@@ -10,6 +10,7 @@
 # - saved as a json file in a given output directory or to a csv file
 # - A report generated if the generateReport option is set to True
 # - Finally an index created using weighted average of the metrics calculated -> provides an overall evaluation of the RAG model.
+from email.headerregistry import HeaderRegistry
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 import json
@@ -36,7 +37,28 @@ class ValidationEngine:
         """
         # Calculate the metrics
         output = []
-        metrics = self.calculate_metrics()
+        list_of_metrics = []
+        
+        # If segments are provided, calculate the metrics for the segments
+        if self.options.segments:
+            for segment in self.options.segments:
+                if segment == "chunking":
+                    list_of_metrics.append("avg_chunk_size")
+                elif segment == "retrieval":
+                    list_of_metrics.extend(["context_score", "embedding_similarity", "named_entity_score", "retrieval_accuracy"])
+                elif segment == "generation":
+                    list_of_metrics.extend(["bleu_score", "rouge_score", "faithfulness", "response_similarity"])
+        else:
+            list_of_metrics = self.options.metrics
+            
+        metrics = self.calculate_metrics(list_of_metrics)
+    
+        # Create a list of dictionaries containing the data points and the corresponsing evaluation metrics
+        # Initially add a dictionary for the average metrics (avg_chunk_size, retrieval_accuracy)
+        output.append({
+            "avg_chunk_size": metrics["avg_chunk_size"],
+            "retrieval_accuracy": metrics["retrieval_accuracy"]
+        })
         for i in range(len(self.dataset.questions)):
             data = {
                 "question": self.dataset.questions[i],
@@ -47,18 +69,21 @@ class ValidationEngine:
             }
             for key, value in metrics.items():
                 # Handle metrics with just one single value
-                if key=="avg_chunk_size":
-                    data[key] = value
-                elif key=="retrieval_accuracy":
-                    data[key] = value
+                if key=="avg_chunk_size" or key=="retrieval_accuracy":
+                    continue   
                 else:
                     data[key] = value[i]
             output.append(data)
+            
+            
+        # Dump and save the output to a json file
+        if self.output_dir:
+            with open(os.path.join(self.output_dir, "output.json"), "w") as f:
+                json.dump(output, f, indent=4)
         
         return output
     
-    def calculate_metrics(self):
-        metrics = self.options.metrics
+    def calculate_metrics(self, metrics):
         scores = {}
         for metric in metrics:
             if metric == "avg_chunk_size":
@@ -103,8 +128,5 @@ if __name__=='__main__':
         ],
         generateReport=False
     )
-    eval = ValidationEngine(dataset=_dataset, options=_options)
+    eval = ValidationEngine(dataset=_dataset, options=_options, output_dir=".")
     result = eval.evaluate()
-    # Dump to a json file
-    with open("output.json", "w") as f:
-        json.dump(result, f, indent=4)

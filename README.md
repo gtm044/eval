@@ -23,6 +23,9 @@ Framework to evaluate RAG systems and synthesize ground truth data.
 - Add a bash to download the spacy corpus on installing the sdk. ``python -m spacy download en_core_web_sm``
 - Implementing bleu score from scratch (as of now imported from the nltk library)
 - About the jaccard index for chunking evaluation, ground truth chunks and whether we shouold include ground truth chunk synthesizing in the synthesize class.
+- Add the averaged metrics (avg_chunk_size and retrieval accuracy as of now) as a seperate dictionary object on appending to the final output list in the ValidationEngine. 
+- Probably change the name of retrieval accuracy to combined retrieveal accuracy and add these two metrics and the average of all other metrics as a seperate dictionary, along with the weighted index score for each segment.
+
 
 ## Roadmap
 - `EvalDataset` data class - Done

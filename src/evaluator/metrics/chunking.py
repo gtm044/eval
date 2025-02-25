@@ -22,7 +22,7 @@ def avg_chunk_size(contexts, limit=[3, 15]):
     mod = lambda x: x if x >= 0 else -x
     index = 1-((2*mod(sizes-midpoint))/(limit[1]-limit[0]))
     
-    return index
+    return round(index, 3)
 
 def jaccard_index(generated_chunks, reference_chunks):
     """
