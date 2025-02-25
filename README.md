@@ -29,8 +29,8 @@ Framework to evaluate RAG systems and synthesize ground truth data.
 
 - Operator to retrieve the ground truth data from a key value store. - Done
 
-- `Synthesize`: Synthesize gt from raw documents
-    - Provide document directly as json or ingest from cloud.
+- `Synthesize`: Synthesize gt from raw documents - Done
+    - Provide document directly as json.
     - Chunk the documents
     - Generate question answer pair for each chunked document
     - If possible, generate a ground truth for the chunks -> induces too much uncertainty.
@@ -41,18 +41,30 @@ Framework to evaluate RAG systems and synthesize ground truth data.
         - Text AutoAugment (TAA) - https://github.com/lancopku/text-autoaugment
         - Ading noise to text embedddings, conerting the noise back to text using vec2text models. -> Need to quantify the noisy text, might not be similar to the initial document.
 
+- Loading the raw documents from json documents - Done.
+- Provide a folder containing the json documents, and the field to consider - Done.
+- If it is a single json document with a list of json objects, provide an extra argument which allows the system to understand which schema it follows - Done.
+
 - `ValidationOptions`: Metric configurations
     - Choose specific metrics/overall system evaluation/segment evaluation (chunking, retrieveal, generation etc)
     - Validate if the metric provided is in the list of implemented metrics.
     - ...
+    - How to specify whether to get the mentioned metrics or perform the entire evaluation?
 
-- For multimodel RAGs:
+- For multimodel RAGs (Future work):
     - What if the document is an image or a table? 
     - What could the user provide as the input? - Instead of reference contexts, the images and the retrieved images instead of the retrieved contexts.
     - How to store images -> numpy array. Evaluation can be performed by comparing the retrieved and reference images using basic array matching. 
     - Very simple metric for image retrieveal evaluation - accuracy (binary classification).
     - Tables: Compilcated, each chunk can be a single row or a set of rows. For retrieveal evaluation, can just match the rows as it is, again binary classicfication metrics. For responses, compare the ground truth and the reference answers, simiarity measures bw the generated response and the retrived document wont work for tables.
     - For synthesizing ground truths for tables, simple prompt engineering is enough, with the serialized json of the table/required row given as the input.
+
+- Chunking metrics:
+    - How to interpret each chunk? Tokenize? Splitting into words doesn't make sense. If we tokenize, will the reference chunks and the generated chunks ever contain the same tokens?
+    - Average chunk size: Tokenize each chunk, find the average of all the chunks. Lets say there are 10 documents (10 chunks), find the length of the tokens of each document, get the average.
+    - For IoU(Jaccard Index), we need the relevant and the retrieved chunks, how would a user get the relevant chunks?  
+    - For the avg_chunk_size, we need a threshold to determine the chunk size that is admissible. User defined or programmed?
+    - Use a normalized parabolic function to get an index value for the average chunk size.
 
 - Ingesting raw data to synthesize ground truth:
     - Structured Formats: CSV, JSON (How to infer schema?), Parquet.

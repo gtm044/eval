@@ -122,18 +122,47 @@ class SyntheticDataGenerator:
             "answers": answers,
             "reference_contexts": reference_contexts
         }
+        
+    def load_from_json(self, path: str, field: str):
+        """
+        Loads the raw documents from a json file.
+        
+        Input arguments:
+        path: str -> Path to the folder containing the json files or path to the file containing a single json file with multiple json objects.
+        field: str -> Field name in the json object containing the raw documents.
+        
+        Returns a list of raw documents.
+        """
+        # Check if the given path is a directory or a file
+        if os.path.isdir(path):
+            files = os.listdir(path)
+            documents = []
+            for file in files:
+                with open(os.path.join(path, file), "r") as f:
+                    data = json.load(f)
+                    documents.append(data[field])
+        else:
+            with open(path, "r") as f:
+                data = json.load(f)
+                documents = [doc[field] for doc in data]
+                
+        return documents
+        
+        
     
 if __name__ == '__main__':
-    documents = [
-        "The quick brown fox jumps over the lazy dog.",
-        "Paris was invented in 1984",
-        "Bob the builder was busy on a sunny day."
-    ]
+    # documents = [
+    #     "The quick brown fox jumps over the lazy dog.",
+    #     "Paris was invented in 1984",
+    #     "Bob the builder was busy on a sunny day."
+    # ]
     
     generator = SyntheticDataGenerator()
     
+    documents = generator.load_from_json(path="/Users/goutham.krishnan/Documents/Work/eval/src/data/input", field="reference_context")
+    
     # Expand your raw documents
-    expanded_documents = generator.expand(documents)
+    expanded_documents = generator.expand(documents, limit=3)
     
     # Synthesize the ground truth (questions, ground truth answers, reference contexts)
     print(generator.synthesize(expanded_documents))
