@@ -1,0 +1,22 @@
+{
+    "experiment_id": "123",
+    "timestamp": "2025-02-27T13:50:14.079366",
+    "chunk_size": 100,
+    "chunk_overlap": 20,
+    "embedding_model": "text-embedding-3-large",
+    "embedding_dimension": 3052,
+    "llm_model": "gpt-4o",
+    "metrics": [
+        "avg_chunk_size",
+        "context_score",
+        "embedding_similarity",
+        "named_entity_score",
+        "retrieval_accuracy",
+        "bleu_score",
+        "rouge_score",
+        "faithfulness",
+        "response_similarity"
+    ],
+    "dataset_size": 30,
+    "dataset_id": "7070211e-74e0-41f8-8281-893c6692fd7d"
+}

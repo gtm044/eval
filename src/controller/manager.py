@@ -64,9 +64,9 @@ class Experiment:
             json.dump(self.metadata, f, indent=4)
             
         if load:
-            self.load_to_couchbase(experiment_dir, collection)
+            self.load_to_couchbase(collection)
         
-    def load_to_couchbase(self, experiment_dir, _collection):
+    def load_to_couchbase(self,  _collection):
         """
         Load the experiment data to Couchbase
         """
@@ -83,8 +83,8 @@ class Experiment:
         # Create couchbase object for the averaged output and load it
         data = dict()
         averaged_data = self.output[:1]
-        averaged_data["metadata"] = self.metadata
-        data[f"{self.options.experiment_id}_average"] = averaged_data
+        averaged_data[0]["metadata"] = self.metadata
+        data[f"{self.options.experiment_id}_average"] = averaged_data[0]
         results = cb_coll.upsert_multi(data)
         
         if len(results.exceptions) > 0:

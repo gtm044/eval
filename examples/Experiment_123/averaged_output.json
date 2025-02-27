@@ -1,0 +1,19 @@
+[
+    {
+        "avg_chunk_size": -127.667,
+        "retrieval_accuracy": 0.0,
+        "avg_context_score": [
+            0.3526666666666667,
+            0.36466666666666664
+        ],
+        "avg_embedding_similarity": 0.24133333333333334,
+        "avg_named_entity_score": 0.007333333333333333,
+        "avg_bleu_score": 0.6426666666666667,
+        "avg_rouge_score": [
+            0.4483333333333333,
+            0.61
+        ],
+        "avg_faithfulness": 7.333333333333333,
+        "avg_response_similarity": 0.8833333333333333
+    }
+]

@@ -26,11 +26,9 @@ class ValidationEngine:
         self,
         dataset: EvalDataset,
         options: ValidationOptions,
-        output_dir: str = None
     ):
         self.dataset = dataset
         self.options = options
-        self.output_dir = output_dir
         
     def evaluate(self):
         """

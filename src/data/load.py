@@ -97,7 +97,7 @@ class LoadOperator:
             prefix = f"{dataset_id}_"
             result = cb_coll.scan(PrefixScan(prefix))
             for r in result:
-                content.apend(r.content_as[dict])
+                content.append(r.content_as[dict])
         else:
             keys = [f"{dataset_id}_{i}" for i in doc_id]
             result = cb_coll.get_multi(keys)
