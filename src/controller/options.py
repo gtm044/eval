@@ -1,10 +1,16 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
-from src.evaluator.options import ValidationOptions
+from pydantic import BaseModel, Field
+from typing import Optional
+
 
 class ExperimentOptions(BaseModel):
     """
-    Expeirment Configuration
+    Experiment Configuration
+    
+    This class defines the configuration options for an experiment, including:
+    - Experiment identifier
+    - Text chunking parameters (size and overlap)
+    - Embedding model configuration
+    - Language model selection
     """
     experiment_id: str = Field(
         ...,
@@ -27,9 +33,6 @@ class ExperimentOptions(BaseModel):
         description="Embedding dimension"
     )
     llm_model : Optional[str] = Field(
-        defualt = None,
+        default = None,  
         description="Language model used for generation"
     )
-    
-
-    

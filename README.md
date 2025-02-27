@@ -1,64 +1,154 @@
-# eval
-Framework to evaluate RAG systems and synthesize ground truth data.
+# RAG Evaluation Framework
+
+A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) systems and synthesizing ground truth data.
+
+## Overview
+
+This framework provides tools and metrics to evaluate RAG systems across three key components:
+- Chunking evaluation
+- Retrieval evaluation
+- Generation evaluation
 
 ## Features
 
-- **EvalDataset Data Class**: 
-  - Define and manage evaluation datasets with fields for questions, answers, responses, reference contexts, and retrieved contexts.
-  - Validate that all input lists are of the same length.
-  - Converts datasets to JSON format.
+### 1. Evaluation Dataset Management
+- Structured data class for managing evaluation datasets
+- Support for questions, answers, responses, and contexts
+- Automatic validation of dataset integrity
+- JSON conversion utilities
 
-- **LoadOperator**:
-  - Loads processed documents into a Couchbase keyspace.
-  - Retrieves documents from Couchbase and returns them as an `EvalDataset` object.
-  - Automatically handles connection and authentication to Couchbase using environment variables.
+### 2. Comprehensive Metrics
 
-- **SyntheticDataGenerator**:
-  - Generates synthetic questions and answers for provided documents using language models.
-  - Expands documents to create larger datasets.
-  - Synthesizing ground truth data from raw documents.
+#### Chunking Metrics
+- Average chunk size evaluation
+- Normalized scoring system
+- Configurable chunk size limits
 
-## Notes
+#### Retrieval Metrics
+- Context relevance scoring
+- Embedding similarity analysis
+- Named entity matching
+- Retrieval accuracy
 
-- Add a bash to download the spacy corpus on installing the sdk. ``python -m spacy download en_core_web_sm``
-- Implementing bleu score from scratch (as of now imported from the nltk library)
-- About the jaccard index for chunking evaluation, ground truth chunks and whether we shouold include ground truth chunk synthesizing in the synthesize class.
-- For list metric output, handle the output dictionary from the ValidationEngine.
-- Research on report generation. -> Either we use an LLM (give it the otutput dictionary and prompt engineer) or we can design a schema to include descriptions, a score range and the issue description.
+#### Generation Metrics
+- BLEU score
+- ROUGE score
+- Faithfulness evaluation
+- Response similarity analysis
 
+### 3. Experiment Management
+- Structured experiment tracking
+- Metadata management
+- Result persistence
+- Couchbase integration for storage
+
+### 4. Data Generation
+- Synthetic question-answer generation
+- Document expansion capabilities
+- Support for multiple input formats
+
+## Installation
+
+1. Clone the repository
+2. Install the package:
+```bash
+pip install e .
+python -m spacy download en_core_web_sm
+```
+
+## Usage
+
+### Basic Evaluation
+
+```python
+from src.data.dataset import EvalDataset
+from src.evaluator.validation import ValidationEngine
+from src.evaluator.options import ValidationOptions
+
+# Create dataset
+dataset = EvalDataset(
+    questions=["What is RAG?"],
+    answers=["RAG is a retrieval-augmented generation system"],
+    responses=["RAG combines retrieval with generation"],
+    reference_contexts=["RAG systems use retrieval to enhance generation"],
+    retrieved_contexts=["RAG: retrieval-augmented generation"]
+)
+
+# Configure evaluation
+options = ValidationOptions(
+    metrics=["bleu_score", "rouge_score", "faithfulness"],
+    generateReport=True
+)
+
+# Run evaluation
+engine = ValidationEngine(dataset=dataset, options=options)
+results = engine.evaluate()
+```
+
+### Experiment Management
+
+```python
+from src.controller.options import ExperimentOptions
+from src.controller.manager import Experiment
+
+# Configure experiment
+experiment_options = ExperimentOptions(
+    experiment_id="exp_001",
+    chunk_size=100,
+    chunk_overlap=20,
+    embedding_model="text-embedding-3-large",
+    embedding_dimension=3072,
+    llm_model="gpt-4"
+)
+
+# Create and save experiment
+experiment = Experiment(experiment_options, evaluation_results)
+experiment.add(dataset_id="dataset_001", load=True)
+```
+
+## Configuration
+
+The framework uses environment variables for configuration:
+
+```env
+bucket=your_bucket
+scope=your_scope
+collection=your_collection
+cluster_url=your_cluster_url
+cb_username=your_username
+cb_password=your_password
+```
+
+## Output Format
+
+The evaluation produces detailed metrics in both JSON and CSV formats:
+
+```json
+{
+    "avg_chunk_size": -127.667,
+    "retrieval_accuracy": 0.0,
+    "avg_context_score": [0.353, 0.365],
+    "avg_embedding_similarity": 0.241,
+    "avg_named_entity_score": 0.007,
+    "avg_bleu_score": 0.643,
+    "avg_rouge_score": [0.448, 0.61],
+    "avg_faithfulness": 7.333,
+    "avg_response_similarity": 0.883
+}
+```
 
 ## Roadmap
 
-- Method `expand` to expand the given raw documents if the data is small. (Currently using paraphrasing, byut very vague. Try to find other methods to do the same.)
-- ARES - single pipeline from top to bottom. Almost the same thing that we are trying to do. And no dataset expansion implementation.
-- Ideas on expansion:
-    - Text AutoAugment (TAA) - https://github.com/lancopku/text-autoaugment
-    - Ading noise to text embedddings, conerting the noise back to text using vec2text models. -> Need to quantify the noisy text, might not be similar to the initial document.
-- Report Generation
+1. **Data Expansion Methods**
+   - Text AutoAugment integration
+   - Embedding-based noise injection
 
-- Experiment management
-  - Store the evaluation results to a kv store
-  - Each result should have a metadata with the experiment options.
-  - on calling the add function, an output directory is created with the experiment_<experiment_id> as the name and store al the output files inside (output.json, output.csv, averaged_output.csv, averaged_output.json, experiment_config.json)
-  - Experiment Config is the metadata, contains the Experiment Options and the timestamp, the length of the ground truth dataset and the metrics used and the dataset description.
-  - Load the contents of the directory to the couchbase kv store with the metadata with each dictionary content in the ValidationEngine output.
+2. **Multimodal RAG Support**
+   - Image retrieval evaluation
+   - Table content processing
+   - Cross-modal metrics
 
-TO-DO:
-
-- For multimodel RAGs (Future work):
-    - What if the document is an image or a table? 
-    - What could the user provide as the input? - Instead of reference contexts, the images and the retrieved images instead of the retrieved contexts.
-    - How to store images -> numpy array. Evaluation can be performed by comparing the retrieved and reference images using basic array matching. 
-    - Very simple metric for image retrieveal evaluation - accuracy (binary classification).
-    - Tables: Compilcated, each chunk can be a single row or a set of rows. For retrieveal evaluation, can just match the rows as it is, again binary classicfication metrics. For responses, compare the ground truth and the reference answers, simiarity measures bw the generated response and the retrived document wont work for tables.
-    - For synthesizing ground truths for tables, simple prompt engineering is enough, with the serialized json of the table/required row given as the input.
-    - Method for the users to define metrics.
-    - Remove the averaged metrics.
-    - Work on the experiment schema.
-
-
-- Ingesting raw data to synthesize ground truth:
-    - Structured Formats: CSV, JSON (How to infer schema?), Parquet.
-    - Unstructured Formats: PDFs
-    - Logs: ?
-    - File metadata can be provided as the document description.
+3. **Report Generation**
+   - LLM-based analysis
+   - Structured reporting schema
+   - Visualization components

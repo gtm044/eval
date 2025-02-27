@@ -1,22 +1,4 @@
 # src/evaluator/validation.py
-
-## Creates a validation engine to evaluate the performance of the RAG model.
-# Inputs:
-# - EvalDataset method
-# - ValidationOptions method
-# - output directory to save the results
-# Outputs:
-# - list of dictionaries containing the data points and the corresponsing evaluation metrics.
-# - saved as a json file in a given output directory or to a csv file
-# - A report generated if the generateReport option is set to True
-# - Finally an index created using weighted average of the metrics calculated -> provides an overall evaluation of the RAG model.
-from email.headerregistry import HeaderRegistry
-from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
-import json
-import os
-import pandas as pd
-
 from src.evaluator.metrics import chunking, generation, retrieval
 from src.evaluator.options import ValidationOptions
 from src.data.dataset import EvalDataset
@@ -81,20 +63,6 @@ class ValidationEngine:
                 else:
                     data[key] = value[i]
             output.append(data)
-            
-            
-        # # Dump and save the output to a json file
-        # if self.output_dir:
-        #     with open(os.path.join(self.output_dir, "output.json"), "w") as f:
-        #         json.dump(output[1:], f, indent=4)
-        #     with open(os.path.join(self.output_dir, "averaged_output.json"), "w") as f:
-        #         json.dump(output[:1], f, indent=4)
-        #     with open(os.path.join(self.output_dir, "output.csv"), "w") as f:
-        #         df = pd.json_normalize(output[1:])
-        #         df.to_csv(f, index=False)
-        #     with open(os.path.join(self.output_dir, "averaged_output.csv"), "w") as f:
-        #         df = pd.json_normalize(output[:1])
-        #         df.to_csv(f, index=False)
         
         return output, list_of_metrics
     
