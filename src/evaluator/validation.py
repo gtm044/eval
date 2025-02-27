@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 import json
 import os
+import pandas as pd
 
 from src.evaluator.metrics import chunking, generation, retrieval
 from src.evaluator.options import ValidationOptions
@@ -57,8 +58,16 @@ class ValidationEngine:
         # Initially add a dictionary for the average metrics (avg_chunk_size, retrieval_accuracy)
         output.append({
             "avg_chunk_size": metrics["avg_chunk_size"],
-            "retrieval_accuracy": metrics["retrieval_accuracy"]
+            "retrieval_accuracy": metrics["retrieval_accuracy"],
+            "avg_context_score": [sum(x) / len(x) for x in zip(*metrics["context_score"])],
+            "avg_embedding_similarity": sum(metrics["embedding_similarity"]) / len(metrics["embedding_similarity"]),
+            "avg_named_entity_score": sum(metrics["named_entity_score"]) / len(metrics["named_entity_score"]),
+            "avg_bleu_score": sum(metrics["bleu_score"]) / len(metrics["bleu_score"]),
+            "avg_rouge_score": [sum(x) / len(x) for x in zip(*metrics["rouge_score"])],
+            "avg_faithfulness": sum(metrics["faithfulness"]) / len(metrics["faithfulness"]),
+            "avg_response_similarity": sum(metrics["response_similarity"]) / len(metrics["response_similarity"])
         })
+        
         for i in range(len(self.dataset.questions)):
             data = {
                 "question": self.dataset.questions[i],
@@ -79,7 +88,15 @@ class ValidationEngine:
         # Dump and save the output to a json file
         if self.output_dir:
             with open(os.path.join(self.output_dir, "output.json"), "w") as f:
-                json.dump(output, f, indent=4)
+                json.dump(output[1:], f, indent=4)
+            with open(os.path.join(self.output_dir, "averaged_output.json"), "w") as f:
+                json.dump(output[:1], f, indent=4)
+            with open(os.path.join(self.output_dir, "output.csv"), "w") as f:
+                df = pd.json_normalize(output[1:])
+                df.to_csv(f, index=False)
+            with open(os.path.join(self.output_dir, "averaged_output.csv"), "w") as f:
+                df = pd.json_normalize(output[:1])
+                df.to_csv(f, index=False)
         
         return output
     
@@ -108,8 +125,23 @@ class ValidationEngine:
                 scores["response_similarity"] = generation.response_similarity(self.dataset.answers, self.dataset.responses)
             else:
                 raise ValueError(f"Metric {metric} is not implemented yet.")
-            
         return scores
+    
+    # Not completed yet
+    def calculate_index(self, avg_scores):
+        """
+        Calculate the index based on the weighted average of the metrics.
+        """
+        weight = 0.5
+        chunking_index = (weight * avg_scores["avg_chunk_size"] + (1 - weight) * avg_scores["retrieval_accuracy"]) / 2
+        retrieval_index = (weight * avg_scores["context_score"] + weight * avg_scores["embedding_similarity"] + weight * avg_scores["named_entity_score"] + weight * avg_scores["retrieval_accuracy"]) / 4
+        generation_index = (weight * avg_scores["bleu_score"] + weight * avg_scores["rouge_score"] + weight * avg_scores["faithfulness"] + weight * avg_scores["response_similarity"]) / 4
+        return {
+            "chunking_index": chunking_index,
+            "retrieval_index": retrieval_index,
+            "generation_index": generation_index
+        }
+        
         
         
 if __name__=='__main__':
@@ -128,5 +160,5 @@ if __name__=='__main__':
         ],
         generateReport=False
     )
-    eval = ValidationEngine(dataset=_dataset, options=_options, output_dir=".")
+    eval = ValidationEngine(dataset=_dataset, options=_options, output_dir="output_data/")
     result = eval.evaluate()

@@ -54,7 +54,6 @@ def named_entity_score(question, retrieved_contexts):
     for question, context in zip(question, retrieved_contexts):
         question_entities = ner(question)
         context_entities = ner(context)
-        print(question_entities, context_entities)
         intersection = len(question_entities.intersection(context_entities))
         union = len(question_entities.union(context_entities))
         score = intersection / union # How to convert the intersection to a score? -> Probably get the number of interections/total number of entities in the question * 100?

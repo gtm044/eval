@@ -25,39 +25,20 @@ Framework to evaluate RAG systems and synthesize ground truth data.
 - About the jaccard index for chunking evaluation, ground truth chunks and whether we shouold include ground truth chunk synthesizing in the synthesize class.
 - Add the averaged metrics (avg_chunk_size and retrieval accuracy as of now) as a seperate dictionary object on appending to the final output list in the ValidationEngine. 
 - Probably change the name of retrieval accuracy to combined retrieveal accuracy and add these two metrics and the average of all other metrics as a seperate dictionary, along with the weighted index score for each segment.
+- For list metric output, handle the output dictionary from the ValidationEngine.
+- Research on report generation. -> Either we use an LLM (give it the otutput dictionary and prompt engineer) or we can design a schema to include descriptions, a score range and the issue description.
 
 
 ## Roadmap
-- `EvalDataset` data class - Done
-    - Input:  Questions, Ground truth answers, Reference Contexts, Retrieved Contexts, Generated Responses (or subset of these fields)
-    - Ingest from python lists/dictionaries.
 
-- Operator to load the ground truth data into a key value store. - Done
-    - Input: `EvalDataset` data class.
+- Method `expand` to expand the given raw documents if the data is small. (Currently using paraphrasing, byut very vague. Try to find other methods to do the same.)
+- ARES - single pipeline from top to bottom. Almost the same thing that we are trying to do. And no dataset expansion implementation.
+- Ideas on expansion:
+    - Text AutoAugment (TAA) - https://github.com/lancopku/text-autoaugment
+    - Ading noise to text embedddings, conerting the noise back to text using vec2text models. -> Need to quantify the noisy text, might not be similar to the initial document.
+- Report Generation
 
-- Operator to retrieve the ground truth data from a key value store. - Done
-
-- `Synthesize`: Synthesize gt from raw documents - Done
-    - Provide document directly as json.
-    - Chunk the documents
-    - Generate question answer pair for each chunked document
-    - If possible, generate a ground truth for the chunks -> induces too much uncertainty.
-    - Refer ARES (https://github.com/stanford-futuredata/ARES). Might not be able to integrate ARES directly as it is, might have to tweak the implementation a little bit, not sure if thats possible.
-    - Method `expand` to expand the given raw documents if the data is small. (Currently using paraphrasing, byut very vague. Try to find other methods to do the same.)
-    - ARES - single pipeline from top to bottom. Almost the same thing that we are trying to do. And no dataset expansion implementation.
-    - Ideas on expansion:
-        - Text AutoAugment (TAA) - https://github.com/lancopku/text-autoaugment
-        - Ading noise to text embedddings, conerting the noise back to text using vec2text models. -> Need to quantify the noisy text, might not be similar to the initial document.
-
-- Loading the raw documents from json documents - Done.
-- Provide a folder containing the json documents, and the field to consider - Done.
-- If it is a single json document with a list of json objects, provide an extra argument which allows the system to understand which schema it follows - Done.
-
-- `ValidationOptions`: Metric configurations
-    - Choose specific metrics/overall system evaluation/segment evaluation (chunking, retrieveal, generation etc)
-    - Validate if the metric provided is in the list of implemented metrics.
-    - ...
-    - How to specify whether to get the mentioned metrics or perform the entire evaluation?
+TO-DO:
 
 - For multimodel RAGs (Future work):
     - What if the document is an image or a table? 
@@ -66,16 +47,9 @@ Framework to evaluate RAG systems and synthesize ground truth data.
     - Very simple metric for image retrieveal evaluation - accuracy (binary classification).
     - Tables: Compilcated, each chunk can be a single row or a set of rows. For retrieveal evaluation, can just match the rows as it is, again binary classicfication metrics. For responses, compare the ground truth and the reference answers, simiarity measures bw the generated response and the retrived document wont work for tables.
     - For synthesizing ground truths for tables, simple prompt engineering is enough, with the serialized json of the table/required row given as the input.
-
-- Chunking metrics - Done:
-    - How to interpret each chunk? Tokenize? Splitting into words doesn't make sense. If we tokenize, will the reference chunks and the generated chunks ever contain the same tokens?
-    - Average chunk size: Tokenize each chunk, find the average of all the chunks. Lets say there are 10 documents (10 chunks), find the length of the tokens of each document, get the average.
-    - For IoU(Jaccard Index), we need the relevant and the retrieved chunks, how would a user get the relevant chunks?  
-    - For the avg_chunk_size, we need a threshold to determine the chunk size that is admissible. User defined or programmed?
-    - Use a normalized parabolic function to get an index value for the average chunk size.
-
-- Retrieval metrics:
-    - For contet scores, ROUGE scores can be either written from scratch, or loaded from the hugggingface evaluate library.
+    - Method for the users to define metrics.
+    - Remove the averaged metrics.
+    - Work on the experiment schema.
 
 
 - Ingesting raw data to synthesize ground truth:

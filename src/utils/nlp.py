@@ -25,8 +25,8 @@ def rouge_n(candidate, reference, n=3):
     """
     ngrams_A, ngrams_B = n_gram(candidate.split(), n), n_gram(reference.split(), n)
     overlaps = len(set(ngrams_A).intersection(set(ngrams_B)))
-    recall = overlaps / len(ngrams_B)
-    precision = overlaps / len(ngrams_A)
+    recall = overlaps / len(ngrams_B) if len(ngrams_B) > 0 else 0
+    precision = (overlaps / len(ngrams_A)) if len(ngrams_A) > 0 else 0
     
     if recall + precision == 0:
         return 0.0

@@ -13,7 +13,7 @@ from couchbase.options import ClusterOptions, TLSVerifyMode
 from couchbase.exceptions import CouchbaseException, DocumentNotFoundException
 from couchbase.kv_range_scan import PrefixScan
 
-from dataset import EvalDataset
+from src.data.dataset import EvalDataset
 
 load_dotenv()    
     
@@ -61,7 +61,6 @@ class LoadOperator:
         for i in range(0, len(json_data), batch_size):
             docs_to_insert = dict()
             for doc in json_data[i:i+batch_size]:
-                print(doc)
                 doc["doc_id"] = self.doc_id
                 self.doc_id += 1
                 doc["meta-data"] = {
