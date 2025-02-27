@@ -23,8 +23,6 @@ Framework to evaluate RAG systems and synthesize ground truth data.
 - Add a bash to download the spacy corpus on installing the sdk. ``python -m spacy download en_core_web_sm``
 - Implementing bleu score from scratch (as of now imported from the nltk library)
 - About the jaccard index for chunking evaluation, ground truth chunks and whether we shouold include ground truth chunk synthesizing in the synthesize class.
-- Add the averaged metrics (avg_chunk_size and retrieval accuracy as of now) as a seperate dictionary object on appending to the final output list in the ValidationEngine. 
-- Probably change the name of retrieval accuracy to combined retrieveal accuracy and add these two metrics and the average of all other metrics as a seperate dictionary, along with the weighted index score for each segment.
 - For list metric output, handle the output dictionary from the ValidationEngine.
 - Research on report generation. -> Either we use an LLM (give it the otutput dictionary and prompt engineer) or we can design a schema to include descriptions, a score range and the issue description.
 
@@ -37,6 +35,13 @@ Framework to evaluate RAG systems and synthesize ground truth data.
     - Text AutoAugment (TAA) - https://github.com/lancopku/text-autoaugment
     - Ading noise to text embedddings, conerting the noise back to text using vec2text models. -> Need to quantify the noisy text, might not be similar to the initial document.
 - Report Generation
+
+- Experiment management
+  - Store the evaluation results to a kv store
+  - Each result should have a metadata with the experiment options.
+  - on calling the add function, an output directory is created with the experiment_<experiment_id> as the name and store al the output files inside (output.json, output.csv, averaged_output.csv, averaged_output.json, experiment_config.json)
+  - Experiment Config is the metadata, contains the Experiment Options and the timestamp, the length of the ground truth dataset and the metrics used and the dataset description.
+  - Load the contents of the directory to the couchbase kv store with the metadata with each dictionary content in the ValidationEngine output.
 
 TO-DO:
 

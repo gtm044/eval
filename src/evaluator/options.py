@@ -6,10 +6,6 @@ class ValidationOptions(BaseModel):
     """
     Validation Options
     """
-    experiment_id: str = Field(
-        ...,
-        description="Experiment ID"
-    )
     metrics: Optional[List[str]] = Field(
         default = None,
         description="List of metrics to calculate",
@@ -40,6 +36,6 @@ class ValidationOptions(BaseModel):
         return v
     
 if __name__ == '__main__':
-    options = ValidationOptions(experiment_id="1234", metrics=["avg_chunk_size", "jaccard_index", "context_relevance", "context_recall", "context_precision", "retrieval_similarity", "named_entity_score"], segments=["chunking", "retrieval", "generation"], generateReport=True)
+    options = ValidationOptions(metrics=["avg_chunk_size", "jaccard_index", "context_relevance", "context_recall", "context_precision", "retrieval_similarity", "named_entity_score"], segments=["chunking", "retrieval", "generation"], generateReport=True)
     
     print(options)

@@ -85,20 +85,20 @@ class ValidationEngine:
             output.append(data)
             
             
-        # Dump and save the output to a json file
-        if self.output_dir:
-            with open(os.path.join(self.output_dir, "output.json"), "w") as f:
-                json.dump(output[1:], f, indent=4)
-            with open(os.path.join(self.output_dir, "averaged_output.json"), "w") as f:
-                json.dump(output[:1], f, indent=4)
-            with open(os.path.join(self.output_dir, "output.csv"), "w") as f:
-                df = pd.json_normalize(output[1:])
-                df.to_csv(f, index=False)
-            with open(os.path.join(self.output_dir, "averaged_output.csv"), "w") as f:
-                df = pd.json_normalize(output[:1])
-                df.to_csv(f, index=False)
+        # # Dump and save the output to a json file
+        # if self.output_dir:
+        #     with open(os.path.join(self.output_dir, "output.json"), "w") as f:
+        #         json.dump(output[1:], f, indent=4)
+        #     with open(os.path.join(self.output_dir, "averaged_output.json"), "w") as f:
+        #         json.dump(output[:1], f, indent=4)
+        #     with open(os.path.join(self.output_dir, "output.csv"), "w") as f:
+        #         df = pd.json_normalize(output[1:])
+        #         df.to_csv(f, index=False)
+        #     with open(os.path.join(self.output_dir, "averaged_output.csv"), "w") as f:
+        #         df = pd.json_normalize(output[:1])
+        #         df.to_csv(f, index=False)
         
-        return output
+        return output, list_of_metrics
     
     def calculate_metrics(self, metrics):
         scores = {}
