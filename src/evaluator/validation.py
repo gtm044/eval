@@ -97,17 +97,48 @@ class ValidationEngine:
     def calculate_index(self, avg_scores):
         """
         Calculate the index based on the weighted average of the metrics.
+        
+        Args:
+            avg_scores (dict): Dictionary containing the average scores for each metric
+            
+        Returns:
+            dict: Dictionary containing the calculated indices for chunking, retrieval, and generation
         """
+        # Define weights for different components
         weight = 0.5
-        chunking_index = (weight * avg_scores["avg_chunk_size"] + (1 - weight) * avg_scores["retrieval_accuracy"]) / 2
-        retrieval_index = (weight * avg_scores["context_score"] + weight * avg_scores["embedding_similarity"] + weight * avg_scores["named_entity_score"] + weight * avg_scores["retrieval_accuracy"]) / 4
-        generation_index = (weight * avg_scores["bleu_score"] + weight * avg_scores["rouge_score"] + weight * avg_scores["faithfulness"] + weight * avg_scores["response_similarity"]) / 4
+        
+        # Calculate chunking index
+        chunking_index = 0
+        if "avg_chunk_size" in avg_scores and "retrieval_accuracy" in avg_scores:
+            chunking_index = (weight * avg_scores["avg_chunk_size"] + (1 - weight) * avg_scores["retrieval_accuracy"]) / 2
+        
+        # Calculate retrieval index
+        retrieval_metrics = ["context_score", "embedding_similarity", "named_entity_score", "retrieval_accuracy"]
+        retrieval_values = []
+        for metric in retrieval_metrics:
+            if metric in avg_scores:
+                retrieval_values.append(weight * avg_scores[metric])
+        
+        retrieval_index = sum(retrieval_values) / len(retrieval_values) if retrieval_values else 0
+        
+        # Calculate generation index
+        generation_metrics = ["bleu_score", "rouge_score", "faithfulness", "response_similarity"]
+        generation_values = []
+        for metric in generation_metrics:
+            if metric in avg_scores:
+                generation_values.append(weight * avg_scores[metric])
+        
+        generation_index = sum(generation_values) / len(generation_values) if generation_values else 0
+        
+        # Calculate overall RAG index
+        rag_index = (chunking_index + retrieval_index + generation_index) / 3
+        
         return {
             "chunking_index": chunking_index,
             "retrieval_index": retrieval_index,
-            "generation_index": generation_index
+            "generation_index": generation_index,
+            "rag_index": rag_index
         }
-        
         
         
 if __name__=='__main__':
