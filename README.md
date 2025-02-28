@@ -119,24 +119,6 @@ cb_username=your_username
 cb_password=your_password
 ```
 
-## Output Format
-
-The evaluation produces detailed metrics in both JSON and CSV formats:
-
-```json
-{
-    "avg_chunk_size": -127.667,
-    "retrieval_accuracy": 0.0,
-    "avg_context_score": [0.353, 0.365],
-    "avg_embedding_similarity": 0.241,
-    "avg_named_entity_score": 0.007,
-    "avg_bleu_score": 0.643,
-    "avg_rouge_score": [0.448, 0.61],
-    "avg_faithfulness": 7.333,
-    "avg_response_similarity": 0.883
-}
-```
-
 ## Roadmap
 
 1. **Data Expansion Methods**
@@ -151,4 +133,3 @@ The evaluation produces detailed metrics in both JSON and CSV formats:
 3. **Report Generation**
    - LLM-based analysis
    - Structured reporting schema
-   - Visualization components

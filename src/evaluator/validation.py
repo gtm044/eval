@@ -37,15 +37,15 @@ class ValidationEngine:
         # Create a list of dictionaries containing the data points and the corresponsing evaluation metrics
         # Initially add a dictionary for the average metrics (avg_chunk_size, retrieval_accuracy)
         output.append({
-            "avg_chunk_size": metrics["avg_chunk_size"],
-            "retrieval_accuracy": metrics["retrieval_accuracy"],
+            "avg_chunk_size": round(metrics["avg_chunk_size"], 2),
+            "retrieval_accuracy": round(metrics["retrieval_accuracy"], 2),
             "avg_context_score": [sum(x) / len(x) for x in zip(*metrics["context_score"])],
-            "avg_embedding_similarity": sum(metrics["embedding_similarity"]) / len(metrics["embedding_similarity"]),
-            "avg_named_entity_score": sum(metrics["named_entity_score"]) / len(metrics["named_entity_score"]),
-            "avg_bleu_score": sum(metrics["bleu_score"]) / len(metrics["bleu_score"]),
+            "avg_embedding_similarity": round(sum(metrics["embedding_similarity"]) / len(metrics["embedding_similarity"]), 2),
+            "avg_named_entity_score": round(sum(metrics["named_entity_score"]) / len(metrics["named_entity_score"]), 2),
+            "avg_bleu_score": round(sum(metrics["bleu_score"]) / len(metrics["bleu_score"]), 2),
             "avg_rouge_score": [sum(x) / len(x) for x in zip(*metrics["rouge_score"])],
-            "avg_faithfulness": sum(metrics["faithfulness"]) / len(metrics["faithfulness"]),
-            "avg_response_similarity": sum(metrics["response_similarity"]) / len(metrics["response_similarity"])
+            "avg_faithfulness": round(sum(metrics["faithfulness"]) / len(metrics["faithfulness"]), 2),
+            "avg_response_similarity": round(sum(metrics["response_similarity"]) / len(metrics["response_similarity"]), 2)
         })
         
         for i in range(len(self.dataset.questions)):
@@ -57,13 +57,13 @@ class ValidationEngine:
                 "retrieved_context": self.dataset.retrieved_contexts[i]
             }
             for key, value in metrics.items():
-                # Handle metrics with just one single value
+                # Handle metrics with just one single unified value
                 if key=="avg_chunk_size" or key=="retrieval_accuracy":
                     continue   
                 else:
                     data[key] = value[i]
             output.append(data)
-        
+              
         return output, list_of_metrics
     
     def calculate_metrics(self, metrics):
@@ -92,6 +92,7 @@ class ValidationEngine:
             else:
                 raise ValueError(f"Metric {metric} is not implemented yet.")
         return scores
+    
     
     # Not completed yet
     def calculate_index(self, avg_scores):

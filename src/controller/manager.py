@@ -1,19 +1,19 @@
 # Create a experiment management system that manages evalautions as experiments
 import os
 import json
-from typing import List
+from typing import List, Optional
 import pandas as pd
 from datetime import datetime, timedelta
 from src.controller.options import ExperimentOptions
-
+from src.data.load import LoadOperator
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions, TLSVerifyMode
 from couchbase.exceptions import CouchbaseException, DocumentNotFoundException
-
+from couchbase.kv_range_scan import PrefixScan
 
 class Experiment:
-    def __init__(self, options: ExperimentOptions, evaluation_output: List[dict]):
+    def __init__(self, options: Optional[ExperimentOptions] = None, evaluation_output: Optional[List[dict]] = None):
         """
         Initialize an Experiment instance with configuration options and evaluation results.
         
@@ -22,7 +22,8 @@ class Experiment:
             evaluation_output: List containing evaluation results and metrics
         """
         self.options = options
-        self.output, self.metrics = evaluation_output
+        if evaluation_output is not None:
+            self.output, self.metrics = evaluation_output
         # Couchbase connection credentials from environment variables
         self.bucket = os.getenv("bucket")
         self.scope = os.getenv("scope")
@@ -79,7 +80,29 @@ class Experiment:
         # Optionally load data to Couchbase if requested
         if load:
             self.load_to_couchbase(collection)
+    
+    def retrieve(self, experiment_id, collection=None):
+        """
+        Retrieve an experiment from Couchbase database.
         
+        Args:
+            experiment_id: Identifier for the experiment to retrieve
+        """
+        if collection is not None:
+            self.collection = collection
+        content = []
+        cb = self.connect()
+        
+        cb_coll = cb.scope(self.scope).collection(self.collection)
+        # Create a prefix scan using the experiment id
+        prefix = f"{experiment_id}_"
+        experiment_docs = cb_coll.scan(PrefixScan(prefix))
+        for doc in experiment_docs:
+            content.append(doc.content_as[dict])
+        
+        return content
+    
+    
     def load_to_couchbase(self,  _collection):
         """
         Load the experiment data to Couchbase database.
@@ -187,3 +210,14 @@ class Experiment:
             bucket_manager.create_collection(self.scope, self.collection)
             
         return cb
+    
+if __name__=='__main__':
+    # Example usage for the retrieve function
+    experiment_object = Experiment()
+    result = experiment_object.retrieve("123", collection="experiment")
+    dump_result = json.dumps(result, indent=4)
+    with open("result.json", "w") as f:
+        f.write(dump_result)
+    
+    # Not giving the averaged metrics document evn though it starts wit the preficx
+    # Need to fix this

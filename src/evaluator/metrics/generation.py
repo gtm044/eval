@@ -1,11 +1,3 @@
-# Implement the following metrics:
-# - BLEU score
-# - ROGUE score - Done
-# - Faithfulness
-# - Answer Relevancy
-# - Factual Correctness
-# - Contradiction Detection Score - If time permits
-# - LLM as a judge - If time permits
 import numpy as np
 from src.utils.nlp import rouge_n, rouge_l, cosine_similarity
 from src.utils.models import openai_embedding
@@ -50,7 +42,7 @@ def faithfulness(retrieved_contexts, responses):
         r_keywords = [keyword for keyword, score in r_keywords]
         # Calculate the overlap
         overlap = len(set(c_keywords).intersection(set(r_keywords)))
-        faithfulness_score = round((overlap / len(r_keywords)) * 100, 2)
+        faithfulness_score = round((overlap / len(c_keywords)) * 100, 2)
         scores.append(faithfulness_score)
     return scores 
 

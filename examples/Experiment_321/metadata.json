@@ -1,6 +1,6 @@
 {
-    "experiment_id": "123",
-    "timestamp": "2025-02-27T13:50:14.079366",
+    "experiment_id": "321",
+    "timestamp": "2025-02-28T12:35:26.096510",
     "chunk_size": 100,
     "chunk_overlap": 20,
     "embedding_model": "text-embedding-3-large",
