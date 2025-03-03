@@ -1,5 +1,8 @@
 from setuptools import setup, find_packages
 
+with open("requirements.txt", "r") as f:
+    install_requires = f.read().splitlines()
+
 setup(
     name="eval",  # Name of your package
     version="0.1",  
@@ -7,17 +10,7 @@ setup(
     # long_description=open("README.md").read(),  # Use README.md for long description
     # long_description_content_type="text/markdown",
     packages=find_packages(),  # Automatically find packages in the folder
-    # install_requires=[
-    #     "numpy",
-    #     "scipy",
-    #     "tiktoken",
-    #     "transformers",
-    #     "accelerate",
-    #     "huggingface_hub",  # Example dependencies
-    #     "PyPDF2",
-    #     "graphing",
-    #     "hnswlib"  
-    # ],
+    install_requires=install_requires,
     # extras_require={
     #     "dev": [
     #         "pytest",

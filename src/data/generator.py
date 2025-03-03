@@ -4,8 +4,9 @@ from typing import List
 from dotenv import load_dotenv
 import json
 import os
-
+from src.utils.models import qa_bm25
 from src.utils.prompts import synthetic_query_prompt, synthetic_valid_answer_prompt, expand_documents_prompt
+
 
 load_dotenv()
 
@@ -44,22 +45,26 @@ class SyntheticDataGenerator:
         Generate answers for the provided documents and questions.
         """
         answers = []
-        for question, document in zip(questions, documents):
-            completion = self.openai.chat.completions.create(
-                model = "gpt-4o",
-                messages = [
-                    {
-                        "role": "developer",
-                        "content": synthetic_valid_answer_prompt
-                    },
-                    {
-                        "role": "user",
-                        "content": "Document: "+document+"\n\nQuestion: "+question
-                    }
-                ]
-            )
-            response = completion.choices[0].message
-            answers.append(response.content)
+        # for question, document in zip(questions, documents):
+        #     completion = self.openai.chat.completions.create(
+        #         model = "gpt-4o",
+        #         messages = [
+        #             {
+        #                 "role": "developer",
+        #                 "content": synthetic_valid_answer_prompt
+        #             },
+        #             {
+        #                 "role": "user",
+        #                 "content": "Document: "+document+"\n\nQuestion: "+question
+        #             }
+        #         ]
+        #     )
+        #     response = completion.choices[0].message
+        #     answers.append(response.content)
+
+        for question,document in zip(questions, documents):
+            answers.append(qa_bm25(document, question))
+            
         return answers
     
     def expand(self, documents: List[str], limit=5):
@@ -95,8 +100,7 @@ class SyntheticDataGenerator:
         reference_contexts = documents
         
         questions = self.generate_questions(documents)
-        answers = self.generate_answers(documents, questions)
-        
+        answers = self.generate_answers(documents, questions)        
         # Expand the dataset (logic here)
         
         return {
@@ -134,17 +138,17 @@ class SyntheticDataGenerator:
     
 if __name__ == '__main__':
     
-    # documents = [
-    #     "The quick brown fox jumps over the lazy dog.",
-    #     "Paris was invented in 1984",
-    #     "Bob the builder was busy on a sunny day."
-    # ]
+    documents = [
+        "The quick brown fox jumps over the lazy dog.",
+        "Paris was invented in 1984",
+        "Bob the builder was busy on a sunny day."
+    ]
     
     generator = SyntheticDataGenerator()
-    documents = generator.load_from_json(path=os.environ["input_path"], field="reference_context")
+    # documents = generator.load_from_json(path=os.environ["input_path"], field="reference_context")
     
     # Expand your raw documents
-    expanded_documents = generator.expand(documents, limit=3)
+    # expanded_documents = generator.expand(documents, limit=3)
     
     # Synthesize the ground truth (questions, ground truth answers, reference contexts)
-    print(generator.synthesize(expanded_documents))
+    print(generator.synthesize(documents))
