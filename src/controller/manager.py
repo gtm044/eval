@@ -175,7 +175,6 @@ class Experiment:
         
         print(f"Retrieved experiment data saved to {results_dir}")    
     
-    
 if __name__=='__main__':
     from ragas.metrics import faithfulness, context_precision
     # Example usage for the Experiment class  

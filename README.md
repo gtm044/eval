@@ -9,6 +9,8 @@ This framework provides tools and metrics to evaluate RAG systems across three k
 - Retrieval evaluation
 - Generation evaluation
 
+The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management and result persistence.
+
 ## Features
 
 ### 1. Evaluation Dataset Management
@@ -25,22 +27,22 @@ This framework provides tools and metrics to evaluate RAG systems across three k
 - Configurable chunk size limits
 
 #### Retrieval Metrics
-- Context relevance scoring
-- Embedding similarity analysis
+- Context precision
+- Context recall
 - Named entity matching
-- Retrieval accuracy
+- Embedding similarity analysis
 
 #### Generation Metrics
-- BLEU score
-- ROUGE score
+- Answer relevancy
 - Faithfulness evaluation
-- Response similarity analysis
+- Answer correctness
+- BLEU and ROUGE scores
 
 ### 3. Experiment Management
-- Structured experiment tracking
-- Metadata management
-- Result persistence
-- Couchbase integration for storage
+- Structured experiment tracking with unique experiment IDs
+- Metadata management including chunking, embedding, and LLM parameters
+- Result persistence with Couchbase integration
+- Flexible experiment configuration
 
 ### 4. Data Generation
 - Synthetic question-answer generation
@@ -52,7 +54,7 @@ This framework provides tools and metrics to evaluate RAG systems across three k
 1. Clone the repository
 2. Install the package:
 ```bash
-pip install e .
+pip install -e .
 python -m spacy download en_core_web_sm
 ```
 
@@ -63,7 +65,6 @@ python -m spacy download en_core_web_sm
 ```python
 from src.data.dataset import EvalDataset
 from src.evaluator.validation import ValidationEngine
-from src.evaluator.options import ValidationOptions
 
 # Create dataset
 dataset = EvalDataset(
@@ -74,16 +75,14 @@ dataset = EvalDataset(
     retrieved_contexts=["RAG: retrieval-augmented generation"]
 )
 
-# Configure evaluation
-options = ValidationOptions(
-    metrics=["bleu_score", "rouge_score", "faithfulness"],
-    generateReport=True
+# Run evaluation with RAGAS metrics
+engine = ValidationEngine(
+    dataset=dataset,
+    metrics=["context_precision", "context_recall", "answer_relevancy", "faithfulness", "answer_correctness"]
 )
-
-# Run evaluation
-engine = ValidationEngine(dataset=dataset, options=options)
 results = engine.evaluate()
 ```
+Results are stored in folder named `.results`
 
 ### Experiment Management
 
@@ -94,6 +93,8 @@ from src.controller.manager import Experiment
 # Configure experiment
 experiment_options = ExperimentOptions(
     experiment_id="exp_001",
+    dataset_id="dataset_001",
+    metrics=["context_precision", "context_recall", "faithfulness"],
     chunk_size=100,
     chunk_overlap=20,
     embedding_model="text-embedding-3-large",
@@ -101,14 +102,20 @@ experiment_options = ExperimentOptions(
     llm_model="gpt-4"
 )
 
-# Create and save experiment
-experiment = Experiment(experiment_options, evaluation_results)
-experiment.add(dataset_id="dataset_001", load=True)
+# Create experiment and store results
+experiment = Experiment(dataset=dataset, options=experiment_options)
+
+# Load the experiment config and results to couchbase kv cluster
+experiment.load_to_couchbase()
+
+# Retrieve experiment results from the couchbase kv store
+experiment_result = Experiment().retrieve("exp_001")
 ```
+Results are stored in `.results-<experiment_id>`
 
 ## Configuration
 
-The framework uses environment variables for configuration:
+The framework uses environment variables for Couchbase configuration:
 
 ```env
 bucket=your_bucket
@@ -121,9 +128,10 @@ cb_password=your_password
 
 ## Roadmap
 
-1. **Data Expansion Methods**
-   - Text AutoAugment integration
-   - Embedding-based noise injection
+1. **Advanced Metrics Integration**
+   - Custom metric development
+   - Multi-turn conversation evaluation
+   - Hallucination detection
 
 2. **Multimodal RAG Support**
    - Image retrieval evaluation
@@ -133,3 +141,4 @@ cb_password=your_password
 3. **Report Generation**
    - LLM-based analysis
    - Structured reporting schema
+   - Interactive dashboards
