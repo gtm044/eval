@@ -3,28 +3,23 @@ import os
 import json
 from typing import List, Optional
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from src.controller.options import ExperimentOptions
 from src.data.load import LoadOperator
-from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
-from couchbase.options import ClusterOptions, TLSVerifyMode
-from couchbase.exceptions import CouchbaseException, DocumentNotFoundException
+from src.data.dataset import EvalDataset
 from couchbase.kv_range_scan import PrefixScan
+from src.evaluator.validation import ValidationEngine
 
 class Experiment:
-    def __init__(self, options: Optional[ExperimentOptions] = None, evaluation_output: Optional[List[dict]] = None):
+    def __init__(self, dataset: Optional[EvalDataset] = None, options: Optional[ExperimentOptions] = None):
         """
         Initialize an Experiment instance with configuration options and evaluation results.
         
         Args:
             options: Configuration parameters for the experiment
-            evaluation_output: List containing evaluation results and metrics
         """
         self.options = options
-        if evaluation_output is not None:
-            self.output, self.metrics = evaluation_output
-        # Couchbase connection credentials from environment variables
+        # Couchbase cluster credentials
         self.bucket = os.getenv("bucket")
         self.scope = os.getenv("scope")
         self.collection = os.getenv("collection")
@@ -32,32 +27,43 @@ class Experiment:
         self.username = os.getenv("cb_username")
         self.password = os.getenv("cb_password")
         
-    def add(self, dataset_id, load=False, collection=None):
-        """
-        Add the experiment to the list of experiments and save results to files.
+        # If experiment options are not provided, the class acts as a retriever
+        if options is None:
+            return
         
-        Args:
-            dataset_id: Identifier for the dataset used in the experiment
-            load: Boolean flag to determine if results should be loaded to Couchbase
-            collection: Optional custom Couchbase collection name
-        """
-        # Create a directory with the name Experiment_<Experiment_id>
-        experiment_dir = f"Experiment_{self.options.experiment_id}"
-        os.makedirs(experiment_dir, exist_ok=True)
+        # Load the dataset
+        if dataset is not None:
+            self.dataset = dataset
+        else:
+            if self.options.dataset_id is None:
+                raise ValueError("Dataset ID must be provided in experiment options")
+            self.load_operator = LoadOperator()
+            self.dataset = self.load_operator.retrieve_docs(self.options.dataset_id)
         
-        # Save detailed results (all except first item) to JSON and CSV
-        with open(os.path.join(experiment_dir, "output.json"), "w") as f:
-            json.dump(self.output[1:], f, indent=4)
-        with open(os.path.join(experiment_dir, "output.csv"), "w") as f:
-            df = pd.json_normalize(self.output[1:])
-            df.to_csv(f, index=False)
-            
-        # Save averaged results (first item only) to JSON and CSV
-        with open(os.path.join(experiment_dir, "averaged_output.json"), "w") as f:
-            json.dump(self.output[:1], f, indent=4)
-        with open(os.path.join(experiment_dir, "averaged_output.csv"), "w") as f:
-            df = pd.json_normalize(self.output[:1])
-            df.to_csv(f, index=False)
+        if not isinstance(self.dataset, EvalDataset):
+            raise ValueError(f"Failed to load dataset with ID: {self.options.dataset_id}")
+        
+        # Either metrics or segments must be provided, validate the same
+        if self.options.metrics is None and self.options.segments is None:
+            raise ValueError("Either metrics or segments must be provided in experiment options")
+        
+        # Create validation engine and run evaluation
+        validation_engine = ValidationEngine(
+            dataset=self.dataset,
+            metrics=self.options.metrics,
+            segments=self.options.segments
+        )
+        
+        # Run the evaluation
+        self.output, self.metrics, _ = validation_engine.evaluate()
+        
+        # Rename the .results directory created by the the validationEngine to ".results-experiment_id"
+        results_dir = ".results"
+        if os.path.exists(results_dir) and os.path.isdir(results_dir):
+            os.rename(results_dir, f".results-{self.options.experiment_id}")
+        
+        # Metrics retrieved from the validation engine are of type ragas metric object, get their names
+        self.metrics = [metric.name for metric in self.metrics]
         
         # Create the experiment metadata with configuration and results summary
         self.metadata= {
@@ -70,72 +76,39 @@ class Experiment:
             "llm_model": self.options.llm_model,
             "metrics": self.metrics,
             "dataset_size": len(self.output)-1,
-            "dataset_id": dataset_id
+            "dataset_id": self.options.dataset_id
         }
         
-        # Save metadata to a separate file
-        with open(os.path.join(experiment_dir, "metadata.json"), "w") as f:
+        # Save the metadata to the results directory
+        results_dir = f".results-{self.options.experiment_id}"
+        os.makedirs(results_dir, exist_ok=True)
+        with open(os.path.join(results_dir, "experiment_config.json"), "w") as f:
             json.dump(self.metadata, f, indent=4)
             
-        # Optionally load data to Couchbase if requested
-        if load:
-            self.load_to_couchbase(collection)
-    
-    def retrieve(self, experiment_id, collection=None):
-        """
-        Retrieve an experiment from Couchbase database.
-        
-        Args:
-            experiment_id: Identifier for the experiment to retrieve
-        """
-        if collection is not None:
-            self.collection = collection
-        content = []
-        cb = self.connect()
-        
-        cb_coll = cb.scope(self.scope).collection(self.collection)
-        # Create a prefix scan using the experiment id
-        prefix = f"{experiment_id}_"
-        experiment_docs = cb_coll.scan(PrefixScan(prefix))
-        for doc in experiment_docs:
-            content.append(doc.content_as[dict])
-        
-        return content
-    
-    
-    def load_to_couchbase(self,  _collection):
+            
+    def load_to_couchbase(self,  collection=None):
         """
         Load the experiment data to Couchbase database.
         
         Args:
-            _collection: Optional custom collection name to use instead of default
+            collection: Optional custom collection name to use instead of default
         """
         # If a separate collection is defined by the user, use that collection
-        if _collection is not None:
-            self.collection = _collection
+        if collection is not None:
+            self.collection = collection
             
         object_id = 1
-        cb = self.connect()
+        load_operator = LoadOperator()
+        cb = load_operator.connect(collection=self.collection)
         cb_coll = cb.scope(self.scope).collection(self.collection)
         batch_exceptions = []
-        batch_size = 100  # Process data in batches of 100 for efficiency
-
-        # Create Couchbase object for the averaged output and load it
-        data = dict()
-        averaged_data = self.output[:1]
-        averaged_data[0]["metadata"] = self.metadata  # Attach metadata to the averaged result
-        data[f"{self.options.experiment_id}_average"] = averaged_data[0]
-        results = cb_coll.upsert_multi(data)
-        
-        # Track any exceptions during the averaged data upload
-        if len(results.exceptions) > 0:
-            batch_exceptions.append(results.exceptions)
+        batch_size = 100  
         
         # Create Couchbase objects for the individual data points and load them in batches
-        for i in range(0, len(self.output[1:]), batch_size):
+        for i in range(0, len(self.output), batch_size):
             data = dict()
-            for object in self.output[1:][i:i+batch_size]:
-                object["metadata"] = self.metadata  # Attach metadata to each individual result
+            for object in self.output[i:i+batch_size]:
+                object["metadata"] = self.metadata  
                 data[f"{self.options.experiment_id}_{object_id}"] = object
                 object_id += 1
             results = cb_coll.upsert_multi(data)
@@ -149,75 +122,94 @@ class Experiment:
         else:
             print(f"Experiment data loaded successfully with experiment id: {self.options.experiment_id}")
         
-            
-    def connect(self):
+    
+    def retrieve(self, experiment_id, collection=None):
         """
-        Establish connection to Couchbase cluster and ensure required scopes and collections exist.
+        Retrieve an experiment from Couchbase database.
         
-        Returns:
-            Couchbase bucket reference if connection successful, None otherwise
+        Args:
+            experiment_id: Identifier for the experiment to retrieve
+            collection: Optional custom collection name to use instead of default
         """
-        # Check if the environment variable `has_cert_file` field is set
-        has_cert_file = os.getenv("has_cert_file") or False
-            
-        # Configure authentication based on certificate availability
-        if has_cert_file:
-            auth = PasswordAuthenticator(self.username, self.password, cert_path="/root/cert.txt")
-        else:
-            auth = PasswordAuthenticator(self.username, self.password)
-            
-        # Set up connection options with WAN development profile
-        options = ClusterOptions(auth)
-        options.apply_profile("wan_development")
-
-        # Determine environment and connect accordingly
-        env = os.getenv("env") or "dev"
-        try:
-            if env == "dev":
-                # Skip TLS verification in development environment
-                self.cluster = Cluster.connect(self.cluster_url, options, tls_verify=TLSVerifyMode.NONE)
-            else:
-                # Use default TLS verification in production
-                self.cluster = Cluster.connect(self.cluster_url, options)
-            # Wait for cluster to be ready with timeout
-            self.cluster.wait_until_ready(timedelta(seconds=30))
-            
-        except CouchbaseException as e:
-            print(f"Unable to connect to the cluster: {e}")
-            return None
+        results_dir = f".results-{experiment_id}"
+        result_json_path = os.path.join(results_dir, "result.json")
         
-        # Get bucket reference
-        cb = self.cluster.bucket(self.bucket)
-
-        # Get the bucket manager for collection operations
-        bucket_manager = cb.collections()
-
-        # Create a new scope if it does not exist
-        scopes = bucket_manager.get_all_scopes()
-        scope_exists = any(s.name == self.scope for s in scopes)
-        if not scope_exists:
-            bucket_manager.create_scope(self.scope)
-
-        # Create a new collection within the scope if collection does not exist
-        if scope_exists:
-            # Get all collections in the target scope
-            collections = [c.name for s in scopes if s.name == self.scope for c in s.collections]
-            collection_exists = self.collection in collections
-            if not collection_exists:
-                bucket_manager.create_collection(self.scope, self.collection)
-        else:
-            # If scope was just created, create the collection as well
-            bucket_manager.create_collection(self.scope, self.collection)
-            
-        return cb
+        if collection is not None:
+            self.collection = collection
+        content = []
+        
+        # Get the connection to couchbase cluster
+        load_operator = LoadOperator()
+        cb = load_operator.connect(collection=self.collection)
+        cb_coll = cb.scope(self.scope).collection(self.collection)
+        
+        # Create a prefix scan using the experiment id
+        prefix = f"{experiment_id}_"
+        experiment_docs = cb_coll.scan(PrefixScan(prefix))
+        for doc in experiment_docs:
+            content.append(doc.content_as[dict])
+        
+        os.makedirs(results_dir, exist_ok=True)
+        
+        # Save the results as JSON, CSV and metadata
+        with open(result_json_path, "w") as f:
+            # Remove metadata from each item before saving
+            content_without_metadata = []
+            for item in content:
+                item_copy = item.copy()
+                if "metadata" in item_copy:
+                    del item_copy["metadata"]
+                content_without_metadata.append(item_copy)
+            json.dump(content_without_metadata, f, indent=4)
+        
+        # Save as CSV
+        df = pd.DataFrame(content)
+        if "metadata" in df.columns:
+            df = df.drop(columns=["metadata"])
+        df.to_csv(os.path.join(results_dir, "result.csv"), index=False)
+        
+        # Save metadata
+        if content and "metadata" in content[0]:
+            with open(os.path.join(results_dir, "experiment_config.json"), "w") as f:
+                json.dump(content[0]["metadata"], f, indent=4)
+        
+        print(f"Retrieved experiment data saved to {results_dir}")    
+    
     
 if __name__=='__main__':
-    # Example usage for the retrieve function
-    experiment_object = Experiment()
-    result = experiment_object.retrieve("123", collection="experiment")
-    dump_result = json.dumps(result, indent=4)
-    with open("result.json", "w") as f:
-        f.write(dump_result)
+    from ragas.metrics import faithfulness, context_precision
+    # Example usage for the Experiment class  
+    data = {
+        "questions": ["What is the capital of France?", "Who is the president of the USA?"],
+        "answers": [["Paris", "France"], ["Washington", "USA"]],
+        "responses": ["Paris", "Joe Biden"],
+        "reference_contexts": ["Paris is the capital of France", "The USA is a country in North America"],
+        "retrieved_contexts": [["Paris is the capital of France", "France is a country in Europe"], ["Washington is the capital of the USA", "The USA is a country in North America"]]
+    }
+    dataset = EvalDataset(**data)
+    dataset.to_json("test.json")
+    loader = LoadOperator(data=dataset, dataset_description="Test dataset")
+    loader.load_docs()
+      
+    # Create experiment options
+    options = ExperimentOptions(
+        experiment_id="123",
+        dataset_id=loader.dataset_id,
+        metrics=[context_precision, faithfulness],
+        chunk_size=512,
+        chunk_overlap=50,
+        embedding_model="sentence-transformers/all-mpnet-base-v2",
+        llm_model="gpt-4o-mini",
+        embedding_dimension=3072
+    )
     
-    # Not giving the averaged metrics document evn though it starts wit the preficx
-    # Need to fix this
+    # Initialize experiment with options
+    experiment = Experiment(options=options)
+    experiment.load_to_couchbase(collection="experiment2")
+    
+    # # Test retrieve functionality
+    experiment = Experiment()
+    print("Testing retrieve functionality...")
+    experiment.retrieve(experiment_id="123", collection="experiment2")
+    
+    print("Done! Check the .results-123 directory for output files")

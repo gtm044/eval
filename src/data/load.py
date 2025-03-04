@@ -108,12 +108,12 @@ class LoadOperator:
         output_dict = {}
         if content[0]["question"]:
             output_dict["questions"] = [c["question"] for c in content]
-        if content[0]["answer"]:
-            output_dict["answers"] = [c["answer"] for c in content]
+        if content[0]["answers"]:
+            output_dict["answers"] = [c["answers"] for c in content]
         if content[0]["response"]:
             output_dict["responses"] = [c["response"] for c in content]
-        if content[0]["reference_context"]:
-            output_dict["reference_contexts"] = [c["reference_context"] for c in content]
+        if content[0]["reference_contexts"]:
+            output_dict["reference_contexts"] = [c["reference_contexts"] for c in content]
         if content[0]["retrieved_context"]:    
             output_dict["retrieved_contexts"] = [c["retrieved_context"] for c in content]
         
@@ -122,10 +122,14 @@ class LoadOperator:
         
         
 
-    def connect(self):
+    def connect(self, collection=None):
         # Check if the environment variable `has_cert_file` field
         has_cert_file = os.getenv("has_cert_file") or False
-            
+        
+        # If a separate collection is defined by the user, use that collection
+        if collection is not None:
+            self.collection = collection
+        
         # Connect to the Couchbase cluster
         if has_cert_file:
             auth = PasswordAuthenticator(self.username, self.password, cert_path="/root/cert.txt")
@@ -174,10 +178,10 @@ class LoadOperator:
 if __name__ == '__main__':
     data = {
         "questions": ["What is the capital of France?", "Who is the president of the USA?"],
-        "answers": ["Paris", "Joe Biden"],
+        "answers": [["Paris", "France"], ["Washington", "USA"]],
         "responses": ["Paris", "Joe Biden"],
-        "reference_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"],
-        "retrieved_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"]
+        "reference_contexts": ["Paris is the capital of France", "The USA is a country in North America"],
+        "retrieved_contexts": [["Paris is the capital of France", "France is a country in Europe"], ["Washington is the capital of the USA", "The USA is a country in North America"]]
     }
     dataset = EvalDataset(**data)
     dataset.to_json("test.json")
@@ -186,4 +190,4 @@ if __name__ == '__main__':
     print(loader.dataset_id)
     # Instantiate a new loader to retrieve the documents
     retriever = LoadOperator() # No arguments for the retriever load operator
-    print(retriever.retrieve_docs(loader.dataset_id, [1, 2]))
+    print(retriever.retrieve_docs(loader.dataset_id))

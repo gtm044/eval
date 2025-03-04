@@ -7,6 +7,7 @@ import os
 from src.utils.models import qa_bm25
 from src.utils.prompts import synthetic_query_prompt, synthetic_valid_answer_prompt, expand_documents_prompt
 
+############ NOT COMPLETED - RUNNING THIS FILE WILL GENERATE ERROR ###################
 
 load_dotenv()
 

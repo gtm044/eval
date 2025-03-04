@@ -12,7 +12,7 @@ class EvalDataset(BaseModel):
         description="List of questions",
         validate_default=True
     )
-    answers: Optional[List[str]] = Field(
+    answers: Optional[List[List[str]]] = Field(
         default = None,
         description="List of ground truth answers",
         validate_default=True
@@ -27,7 +27,7 @@ class EvalDataset(BaseModel):
         description="List of reference contexts",
         validate_default=True
     )
-    retrieved_contexts: Optional[List[str]] = Field(
+    retrieved_contexts: Optional[List[List[str]]] = Field(
         default = None,
         description="List of contexts retrieved for the question by the vector store",
         validate_default=True
@@ -42,9 +42,9 @@ class EvalDataset(BaseModel):
         data = [
             {
                 "question": self.questions[i] if self.questions and i < len(self.questions) else None,
-                "answer": self.answers[i] if self.answers and i < len(self.answers) else None,
+                "answers": self.answers[i] if self.answers and i < len(self.answers) else None,
                 "response": self.responses[i] if self.responses and i < len(self.responses) else None,
-                "reference_context": self.reference_contexts[i] if self.reference_contexts and i < len(self.reference_contexts) else None,
+                "reference_contexts": self.reference_contexts[i] if self.reference_contexts and i < len(self.reference_contexts) else None,
                 "retrieved_context": self.retrieved_contexts[i] if self.retrieved_contexts and i < len(self.retrieved_contexts) else None
             }
             for i in range(max_len)
@@ -55,6 +55,54 @@ class EvalDataset(BaseModel):
                 json.dump(data, f, indent=4) 
 
         return data
+
+    def from_json(cls, json_path):
+        """
+        Create an EvalDataset from a list of JSON objects.
+        
+        Args:
+            json_path: Path to the JSON file containing the data
+                 
+        Returns:
+            EvalDataset: A new dataset instance
+        """
+        with open(json_path, "r") as f:
+            data = json.load(f)
+            
+        # Initialize empty lists for each field
+        questions = []
+        answers = []
+        responses = []
+        reference_contexts = []
+        retrieved_contexts = []
+        
+        # Extract data from each document
+        for doc in data:
+            if doc.get("question") is not None:
+                questions.append(doc["question"])
+            if doc.get("answers") is not None:
+                answers.append(doc["answers"])
+            if doc.get("response") is not None:
+                responses.append(doc["response"])
+            if doc.get("reference_contexts") is not None:
+                reference_contexts.append(doc["reference_contexts"])
+            if doc.get("retrieved_context") is not None:
+                retrieved_contexts.append(doc["retrieved_context"])
+        
+        # Create dataset with non-empty fields
+        dataset_dict = {}
+        if questions:
+            dataset_dict["questions"] = questions
+        if answers:
+            dataset_dict["answers"] = answers
+        if responses:
+            dataset_dict["responses"] = responses
+        if reference_contexts:
+            dataset_dict["reference_contexts"] = reference_contexts
+        if retrieved_contexts:
+            dataset_dict["retrieved_contexts"] = retrieved_contexts
+            
+        return cls(**dataset_dict)
     
     # Checks that all input lists are of the same length
     @field_validator("questions", "answers", "responses", "reference_contexts", "retrieved_contexts", mode="before")
@@ -77,11 +125,11 @@ class EvalDataset(BaseModel):
 if __name__ == '__main__':
     data = {
         "questions": ["What is the capital of France?", "Who is the president of the USA?"],
-        "answers": ["Paris", "Joe Biden"],
+        "answers": [["Paris", "France"], ["Washington", "USA"]],
         "responses": ["Paris", "Joe Biden"],
-        "reference_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"],
-        "retrieved_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"]
+        "reference_contexts": ["Paris is the capital of France", "The USA is a country in North America"],
+        "retrieved_contexts": [["Paris is the capital of France", "France is a country in Europe"], ["Washington is the capital of the USA", "The USA is a country in North America"]]
     }
     dataset = EvalDataset(**data)
     print(dataset)
-    print(dataset.to_json())
+    print(dataset.to_json(filename="test.json"))
