@@ -1,2 +1,0 @@
-avg_chunk_size,retrieval_accuracy,avg_context_score,avg_embedding_similarity,avg_named_entity_score,avg_bleu_score,avg_rouge_score,avg_faithfulness,avg_response_similarity
--127.67,0.0,"[0.3526666666666667, 0.36466666666666664]",0.24,0.01,0.66,"[0.46366666666666667, 0.622]",9.33,0.9
