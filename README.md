@@ -54,6 +54,7 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 1. Clone the repository
 2. Install the package:
 ```bash
+cd eval
 pip install -e .
 python -m spacy download en_core_web_sm
 ```
