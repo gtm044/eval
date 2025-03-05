@@ -58,9 +58,12 @@ class Experiment:
         self.output, self.metrics, _ = validation_engine.evaluate()
         
         # Rename the .results directory created by the the validationEngine to ".results-experiment_id"
+        # If the directory exits, don't rename it
         results_dir = ".results"
+        new_results_dir = f".results-{self.options.experiment_id}"
         if os.path.exists(results_dir) and os.path.isdir(results_dir):
-            os.rename(results_dir, f".results-{self.options.experiment_id}")
+            if not os.path.exists(new_results_dir):
+                os.rename(results_dir, new_results_dir)
         
         # Metrics retrieved from the validation engine are of type ragas metric object, get their names
         self.metrics = [metric.name for metric in self.metrics]
