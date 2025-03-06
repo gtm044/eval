@@ -1,12 +1,50 @@
 # src/utils/prompts.py
+# synthetic_query_prompt: str = (
+#     "You are an expert question-answering system provided with a document. You must create a question for the provided document. "
+#     "The question must be answerable within the context of the document and should directly ask about information contained in the document even if the information present in the document is false or misleading.\n\n"
+#     "CRITICAL REQUIREMENT: You MUST NOT generate questions that contain any of these phrases or variations of these phrases:\n"
+#     "- 'according to the document'\n"
+#     "- 'in the document'\n" 
+#     "- 'the document states'\n"
+#     "- 'what does the document say'\n"
+#     "- 'based on the document'\n"
+#     "- 'the text mentions'\n"
+#     "- 'as mentioned in'\n\n"
+#     "Instead, ask direct questions such as 'When was Paris founded?' or 'How does the fox move in the story?'\n\n"
+#     "If the document does not contain enough information to generate a question, respond with just 'NO_QUESTION_POSSIBLE'\n\n"
+#     "The response should contain only the question without any additional text or formatting, unless you determine no question is possible.\n\n"
+#     """**Note**: The document provided might also be a json object converted to a string, with each row of the dataset being a json object. If it is a json object, a metadata will be provided along with the document.\n"""
+#     """In this case, you should create a question that can be answered using the information in the json object adhering to the rules mentioned above.\n\n"""
+# )
+
 synthetic_query_prompt: str = (
-    "You are an expert question-answering system provided with a document. You must create a question for the provided document. "
-    "The question must be answerable within the context of the document and should directly ask about information contained in the document.\n\n"
-    "The document might also be a json object converted to a string, with each row of the dataset being a json object. If it is a json object, a metadata will be provided along with the document. "
-    "In this case, you should create a question that can be answered using the information in the json object.\n\n"
-    "Important: Do NOT start with phrases like 'What does this document say about...' or 'According to the document...'. "
-    "Instead, ask direct questions such as 'When was Paris founded?' or 'How does the fox move in the story?'\n\n"
-    "The response should contain only the question without any additional text or formatting.\n\n"
+    "You are an expert question-answering system provided with a document. You must create a natural, direct question based on information in the document.\n\n"
+    
+    "IMPORTANT: Generate questions based EXACTLY on what the document says, even if the information is factually incorrect. For example, if the document states 'The moon is made of cheese', your question should be 'What is the moon made of?' and NOT 'What is the composition of the moon according to scientific evidence?'\n\n"
+    
+    "❌ ABSOLUTELY NEVER USE PHRASES LIKE:\n"
+    "- 'according to the document'\n"
+    "- 'what does the document say about'\n"
+    "- 'as mentioned in the document'\n"
+    "- 'based on the document'\n"
+    "- 'in the document'\n"
+    "- ANY phrase that references 'the document', 'the text', 'the passage', or similar terms\n\n"
+    
+    "❌ NEVER question, correct, or avoid false information in the document. Treat ALL information in the document as valid material for questions.\n\n"
+    
+    "✅ INSTEAD, ASK DIRECT QUESTIONS LIKE:\n"
+    "- 'Where is the Great Wall of China located?'\n"
+    "- 'What is the capital of France?'\n"
+    "- 'When was the Declaration of Independence signed?'\n"
+    "- 'How many planets are in our solar system?'\n\n"
+    
+    "Your questions should sound natural, as if asked by a person who wants to know the information, not as if they're testing knowledge of a specific document.\n\n"
+    
+    "If the document does not contain enough information to generate a question, respond with just 'NO_QUESTION_POSSIBLE'\n\n"
+    
+    "The response should contain only the question without any additional text or formatting, unless you determine no question is possible.\n\n"
+    
+    "Note: The document provided might be a JSON object converted to a string. If so, create a question that can be answered using the information in the JSON object, following the same rules above."
 )
 
 # Prompt to generate well-formed answers.
@@ -15,6 +53,7 @@ synthetic_valid_answer_prompt: str = (
     "The answer must be answerable within the context of the document. "
     "The document might be a JSON object converted to a string, with each row of the dataset being a JSON object. If it is a JSON object, use the information in the JSON to answer the question. A metadata will be provided along with the document if the document is a JSON object representation.\n\n"
     "Generate a complete, well-formed sentence that directly answers the question. The answer should be concise but should not be a single word or phrase. Instead, it should be structured as a meaningful sentence incorporating necessary details from the document.\n\n"
+    "If the question is marked as 'NO_QUESTION_POSSIBLE' or if the document does not contain enough information to answer the question provoded, respond with just 'NO_ANSWER_POSSIBLE'.\n\n"
 )
 
 # Prompt to generate short and specific answers.

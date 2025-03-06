@@ -46,7 +46,7 @@ class SyntheticDataGenerator:
                 messages = messages,
             )            
             response = completion.choices[0].message
-            questions.append(response.content)
+            questions.append(response.content) 
             # Update conversation history
             conversation_history.append({
                 "role": "user",
@@ -71,6 +71,9 @@ class SyntheticDataGenerator:
         
         for question, document in tqdm(zip(questions, documents), desc="Generating answers", total=len(questions)):
             # Generate candidate answer with LLM
+            if question == "NO_QUESTION_POSSIBLE": # Dont generate answer for the tuple if question is "NO_QUESTION_POSSIBLE"
+                answers.append("NO_ANSWER_POSSIBLE")
+                continue
             completion = self.openai.chat.completions.create(
                 model = "gpt-4o",
                 messages = [
@@ -89,47 +92,34 @@ class SyntheticDataGenerator:
         
         return answers
     
-    def expand(self, documents: List[str], limit=5):
-        """
-        Expand the given document by paraphrasing it.
-        """
-        expanded_documents = []
-        for document in tqdm(documents, desc="Expanding documents"):
-            completion = self.openai.chat.completions.create(
-                model = "gpt-4o",
-                messages = [
-                    {
-                        "role": "developer",
-                        "content": expand_documents_prompt
-                    },
-                    {
-                        "role": "user",
-                        "content": "Input Document: "+document+"\n\nLimit: "+str(limit)
-                    }
-                ]
-            )
-            response = completion.choices[0].message
-            for doc in (json.loads(response.content))["expanded_documents"]:
-                expanded_documents.append(doc)
-            
-        return expanded_documents
-        
-    
     def synthesize(self, documents: List[str], metadata=None, expand=False):
         """
         Synthesize questions and answers for the provided documents.
+        Returns:
+            questions: List[str] -> List of questions
+            answers: List[List[str]] -> List of list of answers
+            reference_contexts: List[str] -> List of reference contexts
         """
         reference_contexts = documents
         
-        print("Starting synthesis process...")
+        print("Starting synthesis...")
         questions = self.generate_questions(documents, metadata)
         answers = self.generate_answers(documents, questions, metadata)        
-        # Expand the dataset (logic here)
+                
+        # Filter out data points where question or answer is "NULL"
+        valid_indices = []
+        for i, (question, answer) in enumerate(zip(questions, answers)):
+            if question != "NO_QUESTION_POSSIBLE" or answer != "NO_ANSWER_POSSIBLE":
+                valid_indices.append(i)
+        
+        filtered_questions = [questions[i] for i in valid_indices]
+        filtered_answers = [answers[i] for i in valid_indices]
+        filtered_contexts = [reference_contexts[i] for i in valid_indices]
         
         return {
-            "questions": questions,
-            "answers": answers,
-            "reference_contexts": reference_contexts
+            "questions": filtered_questions,
+            "answers": [filtered_answers],
+            "reference_contexts": filtered_contexts
         }
         
     def synthesize_from_csv(self, path: str, field: str = None, metadata: str = None):
@@ -183,28 +173,33 @@ class SyntheticDataGenerator:
 if __name__ == '__main__':
     
     documents = [
-        "The quick brown fox jumps over the lazy dog.",
-        "Paris was invented in 1984",
-        "Bob the builder was busy on a sunny day."
+        "Joe biden was the 67th president of the US",
+        "The capital of France is Paris",
+        "India is a democratic country",
+        "Lewis Hamilton is a Formula 1 driver",
     ]
     
+    generator = SyntheticDataGenerator()
+    generated_data = generator.synthesize(documents)
+    
+    print(generated_data)
+    
+    exit()
+    
+    ## Synthesizing ground truth from a .csv file
+    
     # Load the data
-    df = pd.read_csv("/Users/goutham.krishnan/Documents/Work/eval/src/data/data.csv")
+    df = pd.read_csv("<path to the csv file>")
     df = df[:10]
     
-    # Drop the column "license"
+    # Simple preprocessing
     df = df.drop(columns=["license"])
-    
-    # Clean the data
     df = df.dropna()
-    
-    # Save the dataframe to a csv file
     df.to_csv("cleaned_data.csv", index=False)
     
     # If generating from a .csv file, then metadata should be provided as a string
-    
     metadata = """
-    [{"Construction year": "number", "NAME": "string", "availability 365": ["number", "string"], "calculated host listings count": ["number", "string"], "cancellation_policy": "string", "country": "string", "country code": "string", "host id": "number", "host name": "string", "host_identity_verified": "string", "house_rules": "string", "id": "string", "instant_bookable": ["boolean", "string"], "last review": "string", "lat": "number", "license": "string", "long": "number", "minimum nights": ["number", "string"], "neighbourhood": "string", "neighbourhood group": "string", "number of reviews": ["number", "string"], "price": ["number", "string"], "review rate number": ["number", "string"], "reviews per month": ["number", "string"], "room type": "string", "service fee": ["number", "string"]}, {"Construction year": "Year when the building was constructed", "NAME": "Name of the Airbnb listing", "availability 365": "The availability of the listing x days in the future as determined by the calendar.", "calculated host listings count": "Number of properties listed by the host", "cancellation_policy": "Cancellation policy applied to this listing, strict , moderate , flexible", "country": "Country where the listing is located", "country code": "Two-letter country code (ISO 3166-1 alpha-2)", "host id": "Airbnb's unique identifier for the host", "host name": "Name of the host,usually only first name", "host_identity_verified": "Indicates whether the host's identity is verified", "house_rules": "Set of rules defined by the host for guests", "id": "Unique identifier for the listing", "instant_bookable": "[t=true; f=false]. Whether the guest can automatically book the listing without the host requiring to accept their", "last review": "Date of the last guest review, format: YYYY-MM-DD HH:MM:SS", "lat": "Latitude coordinate of the listing", "license": "License number required for short-term rental compliance", "long": "Longitude coordinate of the listing", "minimum nights": "Minimum number of nights required for booking", "neighbourhood": "Represents a specific local area or district within a city. Examples include Kensington and Harlem. It provides more granular location details.", "neighbourhood group": "Larger area grouping multiple neighborhoods . A broader classification that groups multiple neighbourhoods together. Examples include Brooklyn and Manhattan. This helps categorize properties into larger city regions.", "number of reviews": "Total number of reviews received by the listing", "price": "Cost per night in USD", "review rate number": "Overall rating given by guests", "reviews per month": "Average number of reviews per month", "room type": "Airbnb hosts can list entire homes/apartments, private, shared rooms, and more recently hotel rooms.Depending on type", "service fee": "Additional service charge applied per booking"}]
+    <provide metadata for the csv/json document>
     """
     
     generator = SyntheticDataGenerator()
@@ -214,7 +209,26 @@ if __name__ == '__main__':
     answers = genrated_data["answers"]
     reference_contexts = genrated_data["reference_contexts"]
     
-    for question, answer, reference_context in zip(questions, answers, reference_contexts):
+    for question, answer, reference_context in zip(questions, answers[0], reference_contexts):
+        print("Question:", question)
+        print("Answer:", answer)
+        print("Reference context:", reference_context)
+        print("\n\n")
+        
+
+    ## Synthesizing ground truth from a json document(s)
+    
+    # Load the data
+    documents = generator.load_from_json(path="<path to the json file>", field="description") # If there are multiple json docs, path should be the directory containing the json files
+    
+    # Synthesize the data
+    genrated_data = generator.synthesize(documents, metadata)
+    
+    questions = genrated_data["questions"]
+    answers = genrated_data["answers"]
+    reference_contexts = genrated_data["reference_contexts"]
+    
+    for question, answer, reference_context in zip(questions, answers[0], reference_contexts):
         print("Question:", question)
         print("Answer:", answer)
         print("Reference context:", reference_context)
