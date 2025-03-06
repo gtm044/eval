@@ -13,7 +13,6 @@ class TestSyntheticQueryPrompt(unittest.TestCase):
         self.openai = OpenAI(api_key=self.api_key)
         self.similarity_threshold = 0.8
 
-    # Helper function to get embeddings
     def get_embedding(self, text):
         response = self.openai.embeddings.create(
             model="text-embedding-ada-002",
@@ -25,7 +24,6 @@ class TestSyntheticQueryPrompt(unittest.TestCase):
     def cosine_similarity(self, a, b):
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-    # Helper function to check if a text is similar to any in a list
     def is_similar_to_any(self, text, possible_texts):
         text_embedding = self.get_embedding(text)
         for possible_text in possible_texts:
@@ -35,12 +33,11 @@ class TestSyntheticQueryPrompt(unittest.TestCase):
                 return True
         return False
 
-    # Helper function to call generate_questions and return a single question
     def get_single_question(self, doc, metadata=None):
-        docs = [doc]  # Wrap in a list
+        docs = [doc]
         generator = SyntheticDataGenerator()
-        questions = generator.generate_questions(docs, metadata)  # Call function
-        return questions[0]  # Unwrap first result
+        questions = generator.generate_questions(docs, metadata)
+        return questions[0]
 
     # 1. TRUE INFORMATION CASES
     def test_true_statement(self):
@@ -186,7 +183,6 @@ class TestSyntheticQueryPrompt(unittest.TestCase):
         doc = "The Statue of Liberty is located in New York."
         question = self.get_single_question(doc)
         
-        # List of banned phrases from prompts.py
         banned_phrases = [
             "according to the document",
             "in the document",
@@ -197,11 +193,9 @@ class TestSyntheticQueryPrompt(unittest.TestCase):
             "as mentioned in"
         ]
         
-        # Check that none of the banned phrases appear in the question
         for phrase in banned_phrases:
             self.assertNotIn(phrase.lower(), question.lower())
             
-        # Also check for common variations
         variations = [
             "the document mentions",
             "as stated in the document",
@@ -218,7 +212,6 @@ class TestSyntheticQueryPrompt(unittest.TestCase):
         metadata = '{"dataset": "world_landmarks"}'
         question = self.get_single_question(doc, metadata)
         
-        # List of banned phrases from prompts.py
         banned_phrases = [
             "according to the document",
             "in the document",
@@ -232,7 +225,6 @@ class TestSyntheticQueryPrompt(unittest.TestCase):
             "the json states"
         ]
         
-        # Check that none of the banned phrases appear in the question
         for phrase in banned_phrases:
             self.assertNotIn(phrase.lower(), question.lower())
 
