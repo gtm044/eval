@@ -7,8 +7,6 @@ setup(
     name="eval",  # Name of your package
     version="0.1",  
     description="RAG evaluation framework",  # Short description
-    # long_description=open("README.md").read(),  # Use README.md for long description
-    # long_description_content_type="text/markdown",
     packages=find_packages(),  # Automatically find packages in the folder
     install_requires=install_requires,
     # extras_require={

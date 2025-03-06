@@ -1,6 +1,6 @@
 # RAG Evaluation Framework
 
-A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) systems and synthesizing ground truth data.
+A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) systems using RAGAS and synthesizing ground truth data from raw documents.
 
 ## Overview
 
@@ -14,39 +14,36 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 ## Features
 
 ### 1. Evaluation Dataset Management
-- Structured data class for managing evaluation datasets
-- Support for questions, answers, responses, and contexts
+- Structured data class (`EvalDataset`) for managing evaluation datasets
+- Support for questions, answers, responses, and contexts (both reference and retrieved)
 - Automatic validation of dataset integrity
 - JSON conversion utilities
 
 ### 2. Comprehensive Metrics
 
 #### Chunking Metrics
-- Average chunk size evaluation
-- Normalized scoring system
-- Configurable chunk size limits
+- Average chunk size evaluation (normalized index from -inf to 1.0, higher is better, >0.5 is acceptable)
+- Will be the same for all data points, indicates the avg_chunk_size for the entire ground truth dataset.
 
 #### Retrieval Metrics
 - Context precision
 - Context recall
-- Named entity matching
-- Embedding similarity analysis
+- Semantic similarity analysis
 
 #### Generation Metrics
 - Answer relevancy
 - Faithfulness evaluation
 - Answer correctness
-- BLEU and ROUGE scores
 
 ### 3. Experiment Management
 - Structured experiment tracking with unique experiment IDs
 - Metadata management including chunking, embedding, and LLM parameters
 - Result persistence with Couchbase integration
-- Flexible experiment configuration
+- Flexible experiment configuration via `ExperimentOptions`
 
 ### 4. Data Generation
 - Synthetic question-answer generation
-- Document expansion capabilities
+- Document processing capabilities
 - Support for multiple input formats
 
 ## Installation
@@ -70,16 +67,18 @@ from src.evaluator.validation import ValidationEngine
 # Create dataset
 dataset = EvalDataset(
     questions=["What is RAG?"],
-    answers=["RAG is a retrieval-augmented generation system"],
+    answers=[["RAG is a retrieval-augmented generation system"]],
     responses=["RAG combines retrieval with generation"],
     reference_contexts=["RAG systems use retrieval to enhance generation"],
-    retrieved_contexts=["RAG: retrieval-augmented generation"]
+    retrieved_contexts=[["RAG: retrieval-augmented generation"]]
 )
 
 # Run evaluation with RAGAS metrics
+from ragas.metrics import context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness
+
 engine = ValidationEngine(
     dataset=dataset,
-    metrics=["context_precision", "context_recall", "answer_relevancy", "faithfulness", "answer_correctness"]
+    metrics=[context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size]
 )
 results = engine.evaluate()
 ```

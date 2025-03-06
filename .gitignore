@@ -11,6 +11,11 @@ input_data/
 *.json
 *.csv
 
+# Cursor
+.cursor/
+.cursorignore
+.cursorindexingignore
+
 # C extensions
 *.so
 

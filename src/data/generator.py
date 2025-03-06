@@ -171,25 +171,20 @@ class SyntheticDataGenerator:
 
     
 if __name__ == '__main__':
-    
-    documents = [
-        "Joe biden was the 67th president of the US",
-        "The capital of France is Paris",
-        "India is a democratic country",
-        "Lewis Hamilton is a Formula 1 driver",
-    ]
-    
-    generator = SyntheticDataGenerator()
-    generated_data = generator.synthesize(documents)
-    
-    print(generated_data)
-    
-    exit()
+    import time
+    import psutil
+    import os
     
     ## Synthesizing ground truth from a .csv file
+    PATH_TO_CSV = "/Users/goutham.krishnan/Documents/Work/eval/src/data/data.csv"
+    
+    # Start measuring time and memory
+    start_time = time.time()
+    process = psutil.Process(os.getpid())
+    start_memory = process.memory_info().rss / 1024 / 1024  # Memory in MB
     
     # Load the data
-    df = pd.read_csv("<path to the csv file>")
+    df = pd.read_csv(PATH_TO_CSV)
     df = df[:10]
     
     # Simple preprocessing
@@ -205,6 +200,10 @@ if __name__ == '__main__':
     generator = SyntheticDataGenerator()
     genrated_data = generator.synthesize_from_csv(path="cleaned_data.csv", metadata="Document is a json object, hence metadata is provided.")
     
+    # End measuring time and memory
+    end_time = time.time()
+    end_memory = process.memory_info().rss / 1024 / 1024  # Memory in MB
+    
     questions = genrated_data["questions"]
     answers = genrated_data["answers"]
     reference_contexts = genrated_data["reference_contexts"]
@@ -214,22 +213,26 @@ if __name__ == '__main__':
         print("Answer:", answer)
         print("Reference context:", reference_context)
         print("\n\n")
+    
+    # Print performance metrics
+    print(f"Processing time: {end_time - start_time:.2f} seconds")
+    print(f"Memory usage: {end_memory - start_memory:.2f} MB")
         
 
     ## Synthesizing ground truth from a json document(s)
     
-    # Load the data
-    documents = generator.load_from_json(path="<path to the json file>", field="description") # If there are multiple json docs, path should be the directory containing the json files
+    # # Load the data
+    # documents = generator.load_from_json(path="<path to the json file>", field="description") # If there are multiple json docs, path should be the directory containing the json files
     
-    # Synthesize the data
-    genrated_data = generator.synthesize(documents, metadata)
+    # # Synthesize the data
+    # genrated_data = generator.synthesize(documents, metadata)
     
-    questions = genrated_data["questions"]
-    answers = genrated_data["answers"]
-    reference_contexts = genrated_data["reference_contexts"]
+    # questions = genrated_data["questions"]
+    # answers = genrated_data["answers"]
+    # reference_contexts = genrated_data["reference_contexts"]
     
-    for question, answer, reference_context in zip(questions, answers[0], reference_contexts):
-        print("Question:", question)
-        print("Answer:", answer)
-        print("Reference context:", reference_context)
-        print("\n\n")
+    # for question, answer, reference_context in zip(questions, answers[0], reference_contexts):
+    #     print("Question:", question)
+    #     print("Answer:", answer)
+    #     print("Reference context:", reference_context)
+    #     print("\n\n")

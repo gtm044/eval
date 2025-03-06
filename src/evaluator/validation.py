@@ -1,8 +1,8 @@
 # src/evaluator/validation.py
-from src.evaluator.metrics import chunking, generation, retrieval
+from src.evaluator.metrics.chunking import avg_chunk_size
 from src.data.dataset import EvalDataset
 from datasets import Dataset
-from typing import List, Optional
+from typing import List, Optional, Union
 import json
 import pandas as pd
 import os
@@ -19,7 +19,7 @@ class ValidationEngine:
     def __init__(
         self,
         dataset: EvalDataset,
-        metrics: Optional[List[Metric] | List[str]] = None,
+        metrics: Optional[List] = None,
         segments: Optional[List[str]] = None,
     ):
         """
@@ -53,10 +53,20 @@ class ValidationEngine:
             }
         )
             
+        # Check if avg_chunk_size is in the metrics list, if present, remove it calculate the avg chunk size
+        for i, metric in enumerate(self.metrics):
+            metric_name = metric.name if hasattr(metric, "name") else metric.__name__
+            if metric_name == "avg_chunk_size":
+                self.metrics.pop(i)
+                avg_chunk_size_result = avg_chunk_size(self.dataset.reference_contexts)
+        
         results = ragas.evaluate(dataset=golden_dataset, metrics=self.metrics)
         
         # Convert to pandas DataFrame
         df = results.to_pandas()
+        
+        # Add the avg chunk size result to the results
+        df["avg_chunk_size"] = avg_chunk_size_result
         
         # Create results directory if it doesn't exist
         results_dir = ".results"
@@ -104,10 +114,14 @@ if __name__=='__main__':
     _dataset = EvalDataset(**data)
     
     # Single-turn evaluation
-    metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness]
-    eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics)
+    metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size]
+    eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics) # Dont provide metrics if you want to use the default metrics
     results, metrics, schema = eval_engine.evaluate()
     print("Single-turn evaluation results:")
     print(json.dumps(results, indent=2))
     print("JSON Schema:")
     print(json.dumps(schema, indent=2))
+    
+    ## Note: The avg_chunk_size will be the same for all data points as it is a normalized index. 
+    ## Ranges from -inf to 1 (Higher is better)
+    ## Any score above 0.5 is acceptable.
