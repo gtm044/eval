@@ -9,15 +9,14 @@ This framework provides tools and metrics to evaluate RAG systems across three k
 - Retrieval evaluation
 - Generation evaluation
 
-The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management and result persistence.
+The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management, storage and result persistence.
 
 ## Features
 
 ### 1. Evaluation Dataset Management
-- Structured data class (`EvalDataset`) for managing evaluation datasets
+- Structured data class ([`EvalDataset`](src/data/dataset.py)) for managing evaluation datasets
 - Support for questions, answers, responses, and contexts (both reference and retrieved)
-- Automatic validation of dataset integrity
-- JSON conversion utilities
+- JSON serialization/deserialization.
 
 ### 2. Comprehensive Metrics
 
@@ -28,7 +27,6 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 #### Retrieval Metrics
 - Context precision
 - Context recall
-- Semantic similarity analysis
 
 #### Generation Metrics
 - Answer relevancy
@@ -39,10 +37,10 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 - Structured experiment tracking with unique experiment IDs
 - Metadata management including chunking, embedding, and LLM parameters
 - Result persistence with Couchbase integration
-- Flexible experiment configuration via `ExperimentOptions`
+- Flexible experiment configuration via [`ExperimentOptions`](src/controller/options.py)
 
 ### 4. Data Generation
-- Synthetic question-answer generation
+- Synthetic ground-truth generation
 - Document processing capabilities
 - Support for multiple input formats
 
@@ -52,11 +50,84 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 2. Install the package:
 ```bash
 cd eval
-pip install -e .
-python -m spacy download en_core_web_sm
+pip install .
 ```
 
+## Configuration
+
+The framework uses environment variables for Couchbase and OpenAI configurations. Refer [`.env-template`](.env-template).
+
 ## Usage
+
+Example usage provided in [`example.ipynb`](examples/rag_eval.ipynb)
+
+### Synthetic Data Generation
+
+The framework provides tools to generate synthetic question-answer pairs from your documents, which can be used as ground truth for evaluation. <span style="color:yellow">For json and csv documents, provide detailed metadata including the dataset schema for accurate data generation.</span>
+
+#### From CSV Files
+
+```python
+from src.data.generator import SyntheticDataGenerator
+
+# Initialize the generator
+generator = SyntheticDataGenerator()
+
+# Generate synthetic data from a CSV file
+metadata = "Document contains product descriptions with fields: name, description, price, and category."
+generated_data = generator.synthesize_from_csv(
+    path="data/products.csv",
+    field="description",  # Optional: specify which field to use
+    metadata=metadata
+)
+
+# Access the generated data
+questions = generated_data["questions"]
+answers = generated_data["answers"]
+reference_contexts = generated_data["reference_contexts"]
+
+# Print sample data
+for question, answer, context in zip(questions, answers[0], reference_contexts):
+    print(f"Question: {question}")
+    print(f"Answer: {answer}")
+    print(f"Context: {context}")
+    print("---")
+```
+
+#### From JSON Documents
+
+```python
+from src.data.generator import SyntheticDataGenerator
+
+# Initialize the generator
+generator = SyntheticDataGenerator()
+
+# Load documents from JSON
+documents = generator.load_from_json(
+    path="data/documents/",  # Can be a directory of JSON files or a single JSON file
+    field="content"  # Optional: specify which field to use
+)
+
+# Generate synthetic data
+metadata = "Documents are technical articles about machine learning."
+generated_data = generator.synthesize(
+    documents=documents,
+    metadata=metadata
+)
+
+# Use the generated data to create an evaluation dataset
+from src.data.dataset import EvalDataset
+
+eval_dataset = EvalDataset(
+    questions=generated_data["questions"],
+    answers=generated_data["answers"],
+    reference_contexts=generated_data["reference_contexts"],
+    # You'll need to add responses and retrieved_contexts after running your RAG system
+)
+
+# Save the dataset
+eval_dataset.to_json("datasets/synthetic_eval_dataset.json")
+```
 
 ### Basic Evaluation
 
@@ -74,17 +145,17 @@ dataset = EvalDataset(
 )
 
 # Run evaluation with RAGAS metrics
-from ragas.metrics import context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness
+from src.evaluator.metrics import context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size
 
 engine = ValidationEngine(
     dataset=dataset,
-    metrics=[context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size]
+    metrics=[context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size] # Calculates a set of default metrics if metrics are not provided
 )
 results = engine.evaluate()
 ```
 Results are stored in folder named `.results`
 
-### Experiment Management
+### Experiment based evaluation
 
 ```python
 from src.controller.options import ExperimentOptions
@@ -94,7 +165,7 @@ from src.controller.manager import Experiment
 experiment_options = ExperimentOptions(
     experiment_id="exp_001",
     dataset_id="dataset_001",
-    metrics=["context_precision", "context_recall", "faithfulness"],
+    metrics=[context_precision, context_recall, faithfulness],
     chunk_size=100,
     chunk_overlap=20,
     embedding_model="text-embedding-3-large",
@@ -102,43 +173,30 @@ experiment_options = ExperimentOptions(
     llm_model="gpt-4"
 )
 
-# Create experiment and store results
-experiment = Experiment(dataset=dataset, options=experiment_options)
+# Create experiment, results are stored
+experiment = Experiment(dataset=dataset, options=experiment_options) #Pulls the dataset from the couchbase cluster if dataset not provided.
 
 # Load the experiment config and results to couchbase kv cluster
 experiment.load_to_couchbase()
 
 # Retrieve experiment results from the couchbase kv store
-experiment_result = Experiment().retrieve("exp_001")
+experiment_result = Experiment().retrieve(experiment_id="exp_001")
 ```
 Results are stored in `.results-<experiment_id>`
 
-## Configuration
-
-The framework uses environment variables for Couchbase configuration:
-
-```env
-bucket=your_bucket
-scope=your_scope
-collection=your_collection
-cluster_url=your_cluster_url
-cb_username=your_username
-cb_password=your_password
-```
 
 ## Roadmap
 
-1. **Advanced Metrics Integration**
-   - Custom metric development
+1. **Basic features**
+   - Custom metric integration
    - Multi-turn conversation evaluation
-   - Hallucination detection
+   - Composite, multi-hop question answer generator.
 
 2. **Multimodal RAG Support**
    - Image retrieval evaluation
    - Table content processing
    - Cross-modal metrics
 
-3. **Report Generation**
-   - LLM-based analysis
-   - Structured reporting schema
-   - Interactive dashboards
+3. **Agentic Evaluation**
+    - Tool call evaluation.
+    - Node transition evaluation.

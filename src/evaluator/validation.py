@@ -1,5 +1,4 @@
 # src/evaluator/validation.py
-from src.evaluator.metrics.chunking import avg_chunk_size
 from src.data.dataset import EvalDataset
 from datasets import Dataset
 from typing import List, Optional, Union
@@ -8,7 +7,7 @@ import pandas as pd
 import os
 import ragas
 from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness
+from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size
 # from ragas.metrics._factual_correctness import FactualCorrectness
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
@@ -55,8 +54,7 @@ class ValidationEngine:
             
         # Check if avg_chunk_size is in the metrics list, if present, remove it calculate the avg chunk size
         for i, metric in enumerate(self.metrics):
-            metric_name = metric.name if hasattr(metric, "name") else metric.__name__
-            if metric_name == "avg_chunk_size":
+            if metric.name == "avg_chunk_size":
                 self.metrics.pop(i)
                 avg_chunk_size_result = avg_chunk_size(self.dataset.reference_contexts)
         
@@ -95,7 +93,6 @@ class ValidationEngine:
         for column in df.columns:
             json_schema["items"]["properties"][column] = {
                 "type": "number" if df[column].dtype in ['float64', 'int64'] else "string",
-                "description": f"RAGAS metric: {column}"
             }
         
         print(f"Results saved to {csv_filename} and {json_filename}")
@@ -125,3 +122,9 @@ if __name__=='__main__':
     ## Note: The avg_chunk_size will be the same for all data points as it is a normalized index. 
     ## Ranges from -inf to 1 (Higher is better)
     ## Any score above 0.5 is acceptable.
+    
+    # How to let users add their own metrics?
+    # 1. Let users define a function according to a predefined schema
+    # 2. Add the function to the metrics list
+    # 3. Provide a decorator to the function so that it can be used as a metrics
+    # 4. Add the function to @src.evaluator.metrics.definitions

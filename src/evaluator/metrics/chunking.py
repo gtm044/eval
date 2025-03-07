@@ -44,7 +44,9 @@ def jaccard_index(generated_chunks, reference_chunks):
         jaccards.append(len(intersection_result) / len(union_result))
         
     return jaccards
-    
+
+# Function attributes
+avg_chunk_size.name = "avg_chunk_size"
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

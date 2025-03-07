@@ -1,21 +1,4 @@
 # src/utils/prompts.py
-# synthetic_query_prompt: str = (
-#     "You are an expert question-answering system provided with a document. You must create a question for the provided document. "
-#     "The question must be answerable within the context of the document and should directly ask about information contained in the document even if the information present in the document is false or misleading.\n\n"
-#     "CRITICAL REQUIREMENT: You MUST NOT generate questions that contain any of these phrases or variations of these phrases:\n"
-#     "- 'according to the document'\n"
-#     "- 'in the document'\n" 
-#     "- 'the document states'\n"
-#     "- 'what does the document say'\n"
-#     "- 'based on the document'\n"
-#     "- 'the text mentions'\n"
-#     "- 'as mentioned in'\n\n"
-#     "Instead, ask direct questions such as 'When was Paris founded?' or 'How does the fox move in the story?'\n\n"
-#     "If the document does not contain enough information to generate a question, respond with just 'NO_QUESTION_POSSIBLE'\n\n"
-#     "The response should contain only the question without any additional text or formatting, unless you determine no question is possible.\n\n"
-#     """**Note**: The document provided might also be a json object converted to a string, with each row of the dataset being a json object. If it is a json object, a metadata will be provided along with the document.\n"""
-#     """In this case, you should create a question that can be answered using the information in the json object adhering to the rules mentioned above.\n\n"""
-# )
 
 synthetic_query_prompt: str = (
     "You are an expert question-answering system provided with a document. You must create a natural, direct question based on information in the document.\n\n"

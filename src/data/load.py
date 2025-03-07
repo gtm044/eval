@@ -26,9 +26,9 @@ class LoadOperator:
     
     Returns the dataset id for the loaded documents.
     """
-    def __init__(self, data:Optional[EvalDataset] = None, dataset_description:Optional[str] = None):
-        if not data:
-            pass
+    def __init__(self, dataset:Optional[EvalDataset] = None, dataset_description:Optional[str] = None):
+        if not dataset:
+            pass # When calling the LoadOperator for retrival, do not initialize
         self.bucket = os.getenv("bucket")
         self.scope = os.getenv("scope")
         self.collection = os.getenv("collection")
@@ -36,17 +36,10 @@ class LoadOperator:
         self.username = os.getenv("cb_username")
         self.password = os.getenv("cb_password")
         
-        self.data = data
+        self.data = dataset
         self.doc_id = 1
-        self.dataset_id = self.generate_parent_id()
+        self.dataset_id = self.data.dataset_id
         self.dataset_description = dataset_description
-        
-    def generate_parent_id(self):
-        """
-        Generates an id for the entire dataset.
-        Used to group all the documents belonging to a dataset in the collection.
-        """
-        return str(uuid.uuid4())
     
     def load_docs(self):
         """
@@ -185,9 +178,9 @@ if __name__ == '__main__':
     }
     dataset = EvalDataset(**data)
     dataset.to_json("test.json")
-    loader = LoadOperator(data=dataset, dataset_description="Test dataset")
+    loader = LoadOperator(dataset=dataset, dataset_description="Test dataset")
     loader.load_docs()
-    print(loader.dataset_id)
+    print(dataset.dataset_id)
     # Instantiate a new loader to retrieve the documents
     retriever = LoadOperator() # No arguments for the retriever load operator
-    print(retriever.retrieve_docs(loader.dataset_id))
+    print(retriever.retrieve_docs(dataset_id=dataset.dataset_id))

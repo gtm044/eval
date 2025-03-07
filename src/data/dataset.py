@@ -2,11 +2,16 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 import json
+import uuid
 
 class EvalDataset(BaseModel):
     """
     Ground truth evaluation dataset
     """
+    dataset_id: Optional[str] = Field(
+        default = str(uuid.uuid4()),
+        description="Unique identifier for the evaluation dataset"
+    )
     questions: Optional[List[str]] = Field(
         default = None,
         description="List of questions",
@@ -109,17 +114,14 @@ class EvalDataset(BaseModel):
     @classmethod
     def validate_length(cls, v, info):
         data = info.data  
-
         # Filter out None fields
         filtered_data = {field: data[field] for field in {"questions", "answers", "responses", "reference_contexts", "retrieved_contexts"} if field in data and data[field] is not None}
-
         # If at least one field is provided, check lengths
         if filtered_data:
             lengths = [len(value) for value in filtered_data.values()]
             if len(set(lengths)) != 1:
                 raise ValueError("All input lists must be of the same length")
         return v
-    
     
     
 if __name__ == '__main__':

@@ -66,7 +66,7 @@ class Experiment:
                 os.rename(results_dir, new_results_dir)
         
         # Metrics retrieved from the validation engine are of type ragas metric object, get their names
-        self.metrics = [metric.name for metric in self.metrics]
+        self.metric_names = [metric.name for metric in self.metrics]
         
         # Create the experiment metadata with configuration and results summary
         self.metadata= {
@@ -77,7 +77,7 @@ class Experiment:
             "embedding_model": self.options.embedding_model,
             "embedding_dimension": self.options.embedding_dimension,
             "llm_model": self.options.llm_model,
-            "metrics": self.metrics,
+            "metrics": self.metric_names,
             "dataset_size": len(self.output)-1,
             "dataset_id": self.options.dataset_id
         }
@@ -179,7 +179,7 @@ class Experiment:
         print(f"Retrieved experiment data saved to {results_dir}")    
     
 if __name__=='__main__':
-    from ragas.metrics import faithfulness, context_precision
+    from src.evaluator.metrics import faithfulness, context_precision
     # Example usage for the Experiment class  
     data = {
         "questions": ["What is the capital of France?", "Who is the president of the USA?"],
@@ -190,13 +190,13 @@ if __name__=='__main__':
     }
     dataset = EvalDataset(**data)
     dataset.to_json("test.json")
-    loader = LoadOperator(data=dataset, dataset_description="Test dataset")
+    loader = LoadOperator(dataset=dataset, dataset_description="Test dataset")
     loader.load_docs()
       
     # Create experiment options
     options = ExperimentOptions(
         experiment_id="123",
-        dataset_id=loader.dataset_id,
+        dataset_id=dataset.dataset_id,
         metrics=[context_precision, faithfulness],
         chunk_size=512,
         chunk_overlap=50,
