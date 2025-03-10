@@ -4,13 +4,11 @@ from datetime import timedelta
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-import uuid
-import json
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions, TLSVerifyMode
-from couchbase.exceptions import CouchbaseException, DocumentNotFoundException
+from couchbase.exceptions import CouchbaseException
 from couchbase.kv_range_scan import PrefixScan
 
 from src.data.dataset import EvalDataset
@@ -26,9 +24,7 @@ class LoadOperator:
     
     Returns the dataset id for the loaded documents.
     """
-    def __init__(self, data:Optional[EvalDataset] = None, dataset_description:Optional[str] = None):
-        if not data:
-            pass
+    def __init__(self, dataset:Optional[EvalDataset] = None, dataset_description:Optional[str] = None):
         self.bucket = os.getenv("bucket")
         self.scope = os.getenv("scope")
         self.collection = os.getenv("collection")
@@ -36,17 +32,13 @@ class LoadOperator:
         self.username = os.getenv("cb_username")
         self.password = os.getenv("cb_password")
         
-        self.data = data
-        self.doc_id = 1
-        self.dataset_id = self.generate_parent_id()
-        self.dataset_description = dataset_description
+        if dataset is None: # When calling the LoadOperator for retrival, do not initialize
+            return
         
-    def generate_parent_id(self):
-        """
-        Generates an id for the entire dataset.
-        Used to group all the documents belonging to a dataset in the collection.
-        """
-        return str(uuid.uuid4())
+        self.data = dataset
+        self.doc_id = 1
+        self.dataset_id = self.data.dataset_id
+        self.dataset_description = dataset_description
     
     def load_docs(self):
         """
@@ -108,24 +100,28 @@ class LoadOperator:
         output_dict = {}
         if content[0]["question"]:
             output_dict["questions"] = [c["question"] for c in content]
-        if content[0]["answer"]:
-            output_dict["answers"] = [c["answer"] for c in content]
+        if content[0]["answers"]:
+            output_dict["answers"] = [c["answers"] for c in content]
         if content[0]["response"]:
             output_dict["responses"] = [c["response"] for c in content]
-        if content[0]["reference_context"]:
-            output_dict["reference_contexts"] = [c["reference_context"] for c in content]
+        if content[0]["reference_contexts"]:
+            output_dict["reference_contexts"] = [c["reference_contexts"] for c in content]
         if content[0]["retrieved_context"]:    
             output_dict["retrieved_contexts"] = [c["retrieved_context"] for c in content]
         
         
-        return EvalDataset(**output_dict)
+        return EvalDataset(dataset_id=dataset_id, **output_dict)
         
         
 
-    def connect(self):
+    def connect(self, collection=None):
         # Check if the environment variable `has_cert_file` field
         has_cert_file = os.getenv("has_cert_file") or False
-            
+        
+        # If a separate collection is defined by the user, use that collection
+        if collection is not None:
+            self.collection = collection
+        
         # Connect to the Couchbase cluster
         if has_cert_file:
             auth = PasswordAuthenticator(self.username, self.password, cert_path="/root/cert.txt")
@@ -174,16 +170,16 @@ class LoadOperator:
 if __name__ == '__main__':
     data = {
         "questions": ["What is the capital of France?", "Who is the president of the USA?"],
-        "answers": ["Paris", "Joe Biden"],
+        "answers": [["Paris", "France"], ["Washington", "USA"]],
         "responses": ["Paris", "Joe Biden"],
-        "reference_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"],
-        "retrieved_contexts": ["Paris is the capital of France", "Joe Biden is the president of the USA"]
+        "reference_contexts": ["Paris is the capital of France", "The USA is a country in North America"],
+        "retrieved_contexts": [["Paris is the capital of France", "France is a country in Europe"], ["Washington is the capital of the USA", "The USA is a country in North America"]]
     }
     dataset = EvalDataset(**data)
     dataset.to_json("test.json")
-    loader = LoadOperator(data=dataset, dataset_description="Test dataset")
+    loader = LoadOperator(dataset=dataset, dataset_description="Test dataset")
     loader.load_docs()
-    print(loader.dataset_id)
+    print(dataset.dataset_id)
     # Instantiate a new loader to retrieve the documents
     retriever = LoadOperator() # No arguments for the retriever load operator
-    print(retriever.retrieve_docs(loader.dataset_id, [1, 2]))
+    print(retriever.retrieve_docs(dataset_id=dataset.dataset_id))

@@ -3,9 +3,18 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# project specific files and folders
 output_data/
 input_data/
 .DS_Store
+.results*
+*.json
+*.csv
+
+# Cursor
+.cursor/
+.cursorignore
+.cursorindexingignore
 
 # C extensions
 *.so
