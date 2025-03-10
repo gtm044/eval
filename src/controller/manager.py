@@ -18,7 +18,6 @@ class Experiment:
         Args:
             options: Configuration parameters for the experiment
         """
-        self.options = options
         # Couchbase cluster credentials
         self.bucket = os.getenv("bucket")
         self.scope = os.getenv("scope")
@@ -31,6 +30,8 @@ class Experiment:
         if options is None:
             return
         
+        self.options = options
+        
         # Load the dataset
         if dataset is not None:
             self.dataset = dataset
@@ -40,12 +41,9 @@ class Experiment:
             self.load_operator = LoadOperator()
             self.dataset = self.load_operator.retrieve_docs(self.options.dataset_id)
         
+        print(type(self.dataset), isinstance(self.dataset, EvalDataset))
         if not isinstance(self.dataset, EvalDataset):
             raise ValueError(f"Failed to load dataset with ID: {self.options.dataset_id}")
-        
-        # Either metrics or segments must be provided, validate the same
-        if self.options.metrics is None and self.options.segments is None:
-            raise ValueError("Either metrics or segments must be provided in experiment options")
         
         # Create validation engine and run evaluation
         validation_engine = ValidationEngine(
@@ -69,7 +67,8 @@ class Experiment:
         self.metric_names = [metric.name for metric in self.metrics]
         
         # Create the experiment metadata with configuration and results summary
-        self.metadata= {
+        # Create base metadata with standard fields
+        self.metadata = {
             "experiment_id": self.options.experiment_id,
             "timestamp": datetime.now().isoformat(),
             "chunk_size": self.options.chunk_size,
@@ -81,6 +80,11 @@ class Experiment:
             "dataset_size": len(self.output)-1,
             "dataset_id": self.options.dataset_id
         }
+        
+        # Add any custom fields from options to metadata
+        for field_name, field_value in self.options.__dict__.items():
+            if field_name not in self.metadata and field_name != "__fields_set__" and field_name != "metrics":
+                self.metadata[field_name] = field_value
         
         # Save the metadata to the results directory
         results_dir = f".results-{self.options.experiment_id}"
@@ -135,7 +139,7 @@ class Experiment:
             collection: Optional custom collection name to use instead of default
         """
         results_dir = f".results-{experiment_id}"
-        result_json_path = os.path.join(results_dir, "result.json")
+        result_json_path = os.path.join(results_dir, "results.json")
         
         if collection is not None:
             self.collection = collection
@@ -169,7 +173,7 @@ class Experiment:
         df = pd.DataFrame(content)
         if "metadata" in df.columns:
             df = df.drop(columns=["metadata"])
-        df.to_csv(os.path.join(results_dir, "result.csv"), index=False)
+        df.to_csv(os.path.join(results_dir, "results.csv"), index=False)
         
         # Save metadata
         if content and "metadata" in content[0]:

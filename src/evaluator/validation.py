@@ -1,7 +1,7 @@
 # src/evaluator/validation.py
 from src.data.dataset import EvalDataset
 from datasets import Dataset
-from typing import List, Optional, Union
+from typing import List, Optional, Any
 import json
 import pandas as pd
 import os
@@ -13,12 +13,14 @@ from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas.metrics.base import Metric
+from tqdm import tqdm
+
 
 class ValidationEngine:
     def __init__(
         self,
         dataset: EvalDataset,
-        metrics: Optional[List] = None,
+        metrics: Optional[List[Any]] = None,
         segments: Optional[List[str]] = None,
     ):
         """
@@ -53,12 +55,17 @@ class ValidationEngine:
         )
             
         # Check if avg_chunk_size is in the metrics list, if present, remove it calculate the avg chunk size
-        for i, metric in enumerate(self.metrics):
-            if metric.name == "avg_chunk_size":
-                self.metrics.pop(i)
-                avg_chunk_size_result = avg_chunk_size(self.dataset.reference_contexts)
-        
-        results = ragas.evaluate(dataset=golden_dataset, metrics=self.metrics)
+        if self.metrics:
+            for i, metric in enumerate(self.metrics):
+                if metric.name == "avg_chunk_size":
+                    self.metrics.pop(i)
+                    print("Calculating average chunk size...")
+                    avg_chunk_size_result = avg_chunk_size([context for context in tqdm(self.dataset.reference_contexts, desc="Processing chunks")])
+            
+            results = ragas.evaluate(dataset=golden_dataset, metrics=self.metrics, show_progress=True)
+            
+        else:
+            results = ragas.evaluate(dataset=golden_dataset, show_progress=True)
         
         # Convert to pandas DataFrame
         df = results.to_pandas()

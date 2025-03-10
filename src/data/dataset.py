@@ -49,8 +49,8 @@ class EvalDataset(BaseModel):
                 "question": self.questions[i] if self.questions and i < len(self.questions) else None,
                 "answers": self.answers[i] if self.answers and i < len(self.answers) else None,
                 "response": self.responses[i] if self.responses and i < len(self.responses) else None,
-                "reference_contexts": self.reference_contexts[i] if self.reference_contexts and i < len(self.reference_contexts) else None,
-                "retrieved_context": self.retrieved_contexts[i] if self.retrieved_contexts and i < len(self.retrieved_contexts) else None
+                "reference_context": self.reference_contexts[i] if self.reference_contexts and i < len(self.reference_contexts) else None,
+                "retrieved_contexts": self.retrieved_contexts[i] if self.retrieved_contexts and i < len(self.retrieved_contexts) else None
             }
             for i in range(max_len)
         ]
@@ -89,10 +89,10 @@ class EvalDataset(BaseModel):
                 answers.append(doc["answers"])
             if doc.get("response") is not None:
                 responses.append(doc["response"])
-            if doc.get("reference_contexts") is not None:
-                reference_contexts.append(doc["reference_contexts"])
-            if doc.get("retrieved_context") is not None:
-                retrieved_contexts.append(doc["retrieved_context"])
+            if doc.get("reference_context") is not None:
+                reference_contexts.append(doc["reference_context"])
+            if doc.get("retrieved_contexts") is not None:
+                retrieved_contexts.append(doc["retrieved_contexts"])
         
         # Create dataset with non-empty fields
         dataset_dict = {}
@@ -118,7 +118,11 @@ class EvalDataset(BaseModel):
         filtered_data = {field: data[field] for field in {"questions", "answers", "responses", "reference_contexts", "retrieved_contexts"} if field in data and data[field] is not None}
         # If at least one field is provided, check lengths
         if filtered_data:
-            lengths = [len(value) for value in filtered_data.values()]
+            # Get the length of each field, accounting for answers and retrieved_contexts being lists of lists
+            lengths = []
+            for field, value in filtered_data.items():
+                lengths.append(len(value))
+                    
             if len(set(lengths)) != 1:
                 raise ValueError("All input lists must be of the same length")
         return v

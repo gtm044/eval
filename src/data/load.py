@@ -4,13 +4,11 @@ from datetime import timedelta
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-import uuid
-import json
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions, TLSVerifyMode
-from couchbase.exceptions import CouchbaseException, DocumentNotFoundException
+from couchbase.exceptions import CouchbaseException
 from couchbase.kv_range_scan import PrefixScan
 
 from src.data.dataset import EvalDataset
@@ -27,14 +25,15 @@ class LoadOperator:
     Returns the dataset id for the loaded documents.
     """
     def __init__(self, dataset:Optional[EvalDataset] = None, dataset_description:Optional[str] = None):
-        if not dataset:
-            pass # When calling the LoadOperator for retrival, do not initialize
         self.bucket = os.getenv("bucket")
         self.scope = os.getenv("scope")
         self.collection = os.getenv("collection")
         self.cluster_url = os.getenv("cluster_url")
         self.username = os.getenv("cb_username")
         self.password = os.getenv("cb_password")
+        
+        if dataset is None: # When calling the LoadOperator for retrival, do not initialize
+            return
         
         self.data = dataset
         self.doc_id = 1
@@ -111,7 +110,7 @@ class LoadOperator:
             output_dict["retrieved_contexts"] = [c["retrieved_context"] for c in content]
         
         
-        return EvalDataset(**output_dict)
+        return EvalDataset(dataset_id=dataset_id, **output_dict)
         
         
 
