@@ -118,7 +118,7 @@ class SyntheticDataGenerator:
         
         return {
             "questions": filtered_questions,
-            "answers": [filtered_answers],
+            "answers": [[filtered_answer] for filtered_answer in filtered_answers],
             "reference_contexts": filtered_contexts
         }
         
@@ -174,41 +174,50 @@ if __name__ == '__main__':
     import time
     import psutil
     import os
+    import argparse
     
-    ## Synthesizing ground truth from a .csv file
-    PATH_TO_CSV = "/Users/goutham.krishnan/Documents/Work/eval/src/data/data.csv"
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Generate synthetic data from CSV or JSON files')
+    parser.add_argument('--path', type=str, required=True, help='Path to the CSV or JSON file')
+    parser.add_argument('--metadata', type=str, required=True, help='Metadata description of the document')
+    parser.add_argument('--field', type=str, help='Field name in JSON to use (optional)')
+    parser.add_argument('--limit', type=int, default=None, help='Limit number of rows to process (optional)')
+    parser.add_argument('--format', type=str, choices=['csv', 'json'], required=True, help='File format (csv or json)')
+    args = parser.parse_args()
     
     # Start measuring time and memory
     start_time = time.time()
     process = psutil.Process(os.getpid())
     start_memory = process.memory_info().rss / 1024 / 1024  # Memory in MB
     
-    # Load the data
-    df = pd.read_csv(PATH_TO_CSV)
-    df = df[:10]
-    
-    # Simple preprocessing
-    df = df.drop(columns=["license"])
-    df = df.dropna()
-    df.to_csv("cleaned_data.csv", index=False)
-    
-    # If generating from a .csv file, then metadata should be provided as a string
-    metadata = """
-    <provide metadata for the csv/json document>
-    """
-    
     generator = SyntheticDataGenerator()
-    genrated_data = generator.synthesize_from_csv(path="cleaned_data.csv", metadata="Document is a json object, hence metadata is provided.")
+    
+    if args.format == 'csv':
+        # Load and preprocess CSV data if needed
+        if args.limit:
+            df = pd.read_csv(args.path)
+            df = df[:args.limit]
+            temp_path = "temp_cleaned_data.csv"
+            df.to_csv(temp_path, index=False)
+            generated_data = generator.synthesize_from_csv(path=temp_path, metadata=args.metadata)
+            os.remove(temp_path)
+        else:
+            generated_data = generator.synthesize_from_csv(path=args.path, metadata=args.metadata)
+    else:  # json
+        documents = generator.load_from_json(path=args.path, field=args.field)
+        if args.limit:
+            documents = documents[:args.limit]
+        generated_data = generator.synthesize(documents=documents, metadata=args.metadata)
     
     # End measuring time and memory
     end_time = time.time()
     end_memory = process.memory_info().rss / 1024 / 1024  # Memory in MB
     
-    questions = genrated_data["questions"]
-    answers = genrated_data["answers"]
-    reference_contexts = genrated_data["reference_contexts"]
+    questions = generated_data["questions"]
+    answers = generated_data["answers"]
+    reference_contexts = generated_data["reference_contexts"]
     
-    for question, answer, reference_context in zip(questions, answers[0], reference_contexts):
+    for question, answer, reference_context in zip(questions, answers, reference_contexts):
         print("Question:", question)
         print("Answer:", answer)
         print("Reference context:", reference_context)
@@ -217,22 +226,8 @@ if __name__ == '__main__':
     # Print performance metrics
     print(f"Processing time: {end_time - start_time:.2f} seconds")
     print(f"Memory usage: {end_memory - start_memory:.2f} MB")
+    print(f"Generated {len(questions)} question-answer pairs")
         
 
-    ## Synthesizing ground truth from a json document(s)
-    
-    # # Load the data
-    # documents = generator.load_from_json(path="<path to the json file>", field="description") # If there are multiple json docs, path should be the directory containing the json files
-    
-    # # Synthesize the data
-    # genrated_data = generator.synthesize(documents, metadata)
-    
-    # questions = genrated_data["questions"]
-    # answers = genrated_data["answers"]
-    # reference_contexts = genrated_data["reference_contexts"]
-    
-    # for question, answer, reference_context in zip(questions, answers[0], reference_contexts):
-    #     print("Question:", question)
-    #     print("Answer:", answer)
-    #     print("Reference context:", reference_context)
-    #     print("\n\n")
+    ## How to use the command line interface
+    # python src/data/generator.py --path <path to the csv/json file> --metadata <metadata description of the document> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format (csv or json)>

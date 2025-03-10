@@ -65,6 +65,11 @@ Example usage provided in [`example.ipynb`](examples/rag_eval.ipynb)
 
 The framework provides tools to generate synthetic question-answer pairs from your documents, which can be used as ground truth for evaluation. <span style="color:yellow">For json and csv documents, provide detailed metadata including the dataset schema for accurate data generation.</span>
 
+For perf logging (memory and runtime):
+~~~sh
+~$ python3 -m src.data.generator --path <path to the csv/json file> --metadata <metadata description of the document> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format (csv or json)>
+~~~
+
 #### From CSV Files
 
 ```python
@@ -87,7 +92,7 @@ answers = generated_data["answers"]
 reference_contexts = generated_data["reference_contexts"]
 
 # Print sample data
-for question, answer, context in zip(questions, answers[0], reference_contexts):
+for question, answer, context in zip(questions, answers, reference_contexts):
     print(f"Question: {question}")
     print(f"Answer: {answer}")
     print(f"Context: {context}")

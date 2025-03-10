@@ -1,0 +1,19 @@
+{
+    "experiment_id": "680a6d21-c051-4cf4-b8f7-f48a0852f4ca",
+    "timestamp": "2025-03-10T10:53:04.031415",
+    "chunk_size": 200,
+    "chunk_overlap": 40,
+    "embedding_model": "text-embedding-3-large",
+    "embedding_dimension": 3072,
+    "llm_model": "gpt-4o",
+    "metrics": [
+        "context_precision",
+        "context_recall",
+        "answer_relevancy",
+        "faithfulness",
+        "answer_correctness"
+    ],
+    "dataset_size": 29,
+    "dataset_id": "2f54a5f5-ab11-47aa-93d6-b422cae9ba0e",
+    "segments": null
+}
