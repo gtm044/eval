@@ -6,7 +6,6 @@ import json
 import os
 import pandas as pd
 from tqdm import tqdm
-from src.utils.models import qa_bm25
 from src.utils.prompts import synthetic_query_prompt, synthetic_valid_answer_prompt, expand_documents_prompt
 
 load_dotenv()
@@ -175,15 +174,20 @@ if __name__ == '__main__':
     import psutil
     import os
     import argparse
+    import tiktoken
     
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Generate synthetic data from CSV or JSON files')
     parser.add_argument('--path', type=str, required=True, help='Path to the CSV or JSON file')
-    parser.add_argument('--metadata', type=str, required=True, help='Metadata description of the document')
+    parser.add_argument('--metadata-file', type=str, required=True, help='Path to a .txt file containing metadata description')
     parser.add_argument('--field', type=str, help='Field name in JSON to use (optional)')
     parser.add_argument('--limit', type=int, default=None, help='Limit number of rows to process (optional)')
     parser.add_argument('--format', type=str, choices=['csv', 'json'], required=True, help='File format (csv or json)')
     args = parser.parse_args()
+    
+    # Read metadata from the provided file
+    with open(args.metadata_file, 'r') as f:
+        metadata = f.read().strip()
     
     # Start measuring time and memory
     start_time = time.time()
@@ -199,15 +203,15 @@ if __name__ == '__main__':
             df = df[:args.limit]
             temp_path = "temp_cleaned_data.csv"
             df.to_csv(temp_path, index=False)
-            generated_data = generator.synthesize_from_csv(path=temp_path, metadata=args.metadata)
+            generated_data = generator.synthesize_from_csv(path=temp_path, metadata=metadata)
             os.remove(temp_path)
         else:
-            generated_data = generator.synthesize_from_csv(path=args.path, metadata=args.metadata)
+            generated_data = generator.synthesize_from_csv(path=args.path, metadata=metadata)
     else:  # json
         documents = generator.load_from_json(path=args.path, field=args.field)
         if args.limit:
             documents = documents[:args.limit]
-        generated_data = generator.synthesize(documents=documents, metadata=args.metadata)
+        generated_data = generator.synthesize(documents=documents, metadata=metadata)
     
     # End measuring time and memory
     end_time = time.time()
@@ -217,17 +221,41 @@ if __name__ == '__main__':
     answers = generated_data["answers"]
     reference_contexts = generated_data["reference_contexts"]
     
+    # Calculate token counts using tiktoken
+    encoding = tiktoken.get_encoding("cl100k_base")  # Using GPT-4o model encoding
+    total_tokens = 0
+    
     for question, answer, reference_context in zip(questions, answers, reference_contexts):
         print("Question:", question)
         print("Answer:", answer)
         print("Reference context:", reference_context)
         print("\n\n")
+        
+        # Count tokens for each item
+        question_tokens = len(encoding.encode(question))
+        answer_tokens = len(encoding.encode(str(answer)))
+        total_tokens += question_tokens + answer_tokens
+    
+    # Calculate token generation metrics
+    processing_time = end_time - start_time
+    tokens_per_second = total_tokens / processing_time if processing_time > 0 else 0
+    seconds_per_token = processing_time / total_tokens if total_tokens > 0 else 0
     
     # Print performance metrics
-    print(f"Processing time: {end_time - start_time:.2f} seconds")
-    print(f"Memory usage: {end_memory - start_memory:.2f} MB")
-    print(f"Generated {len(questions)} question-answer pairs")
-        
-
-    ## How to use the command line interface
-    # python src/data/generator.py --path <path to the csv/json file> --metadata <metadata description of the document> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format (csv or json)>
+    from tabulate import tabulate
+    
+    metrics_data = [
+        ["Processing time", f"{processing_time:.2f} seconds"],
+        ["Memory usage", f"{end_memory - start_memory:.2f} MB"],
+        ["Generated question-answer pairs", f"{len(questions)}"],
+        ["Total tokens generated", f"{total_tokens}"],
+        ["Average tokens per second", f"{tokens_per_second:.2f}"],
+        ["Average time per token", f"{seconds_per_token:.4f} seconds"]
+    ]
+    
+    # Print the table with a nice format
+    print("\n" + "="*50)
+    print("Performance Metrics")
+    print("="*50)
+    print(tabulate(metrics_data, headers=["Metric", "Value"], numalign="left"))
+    print("="*50 + "\n")

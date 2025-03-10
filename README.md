@@ -67,7 +67,7 @@ The framework provides tools to generate synthetic question-answer pairs from yo
 
 For perf logging (memory and runtime):
 ~~~sh
-~$ python3 -m src.data.generator --path <path to the csv/json file> --metadata <metadata description of the document> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format (csv or json)>
+~$ python3 -m src.data.generator --path <path to the csv/json file> --metadata-file <path to metadata txt file> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format ('csv' or 'json')>
 ~~~
 
 #### From CSV Files
@@ -179,7 +179,7 @@ experiment_options = ExperimentOptions(
 )
 
 # Create experiment, results are stored
-experiment = Experiment(dataset=dataset, options=experiment_options) #Pulls the dataset from the couchbase cluster if dataset not provided.
+experiment = Experiment(dataset=dataset, options=experiment_options) #Pulls the dataset from the couchbase cluster using `dataset_id` provided in `experiment_options` if dataset not provided.
 
 # Load the experiment config and results to couchbase kv cluster
 experiment.load_to_couchbase()
@@ -196,6 +196,7 @@ Results are stored in `.results-<experiment_id>`
    - Custom metric integration
    - Multi-turn conversation evaluation
    - Composite, multi-hop question answer generator.
+   - Generating multiple ground truth answers for a given document
 
 2. **Multimodal RAG Support**
    - Image retrieval evaluation
