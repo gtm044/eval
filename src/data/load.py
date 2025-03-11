@@ -104,10 +104,10 @@ class LoadOperator:
             output_dict["answers"] = [c["answers"] for c in content]
         if content[0]["response"]:
             output_dict["responses"] = [c["response"] for c in content]
-        if content[0]["reference_contexts"]:
-            output_dict["reference_contexts"] = [c["reference_contexts"] for c in content]
-        if content[0]["retrieved_context"]:    
-            output_dict["retrieved_contexts"] = [c["retrieved_context"] for c in content]
+        if content[0]["reference_context"]:
+            output_dict["reference_contexts"] = [c["reference_context"] for c in content]
+        if content[0]["retrieved_contexts"]:    
+            output_dict["retrieved_contexts"] = [c["retrieved_contexts"] for c in content]
         
         
         return EvalDataset(dataset_id=dataset_id, **output_dict)
