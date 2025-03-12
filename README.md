@@ -65,15 +65,17 @@ Example usage provided in [`example.ipynb`](examples/rag_eval.ipynb)
 
 The framework provides tools to generate synthetic question-answer pairs from your documents, which can be used as ground truth for evaluation. <span style="color:yellow">For json and csv documents, provide detailed metadata including the dataset schema for accurate data generation.</span>
 
-For perf logging (memory and runtime):
+For generation and perf logging (memory and runtime):
 ~~~sh
 ~$ python3 -m src.data.generator --path <path to the csv/json file> --metadata-file <path to metadata txt file> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format ('csv' or 'json')>
 ~~~
 
+**Note**: Set the OPENAI_API_KEY in the environment variables (.env) file.
+
 #### From CSV Files
 
 ```python
-from src.data.generator import SyntheticDataGenerator
+from eval.src.data.generator import SyntheticDataGenerator
 
 # Initialize the generator
 generator = SyntheticDataGenerator()
@@ -102,7 +104,7 @@ for question, answer, context in zip(questions, answers, reference_contexts):
 #### From JSON Documents
 
 ```python
-from src.data.generator import SyntheticDataGenerator
+from eval.src.data.generator import SyntheticDataGenerator
 
 # Initialize the generator
 generator = SyntheticDataGenerator()
@@ -121,7 +123,7 @@ generated_data = generator.synthesize(
 )
 
 # Use the generated data to create an evaluation dataset
-from src.data.dataset import EvalDataset
+from eval.src.data.dataset import EvalDataset
 
 eval_dataset = EvalDataset(
     questions=generated_data["questions"],
@@ -137,8 +139,8 @@ eval_dataset.to_json("datasets/synthetic_eval_dataset.json")
 ### Basic Evaluation
 
 ```python
-from src.data.dataset import EvalDataset
-from src.evaluator.validation import ValidationEngine
+from eval.src.data.dataset import EvalDataset
+from eval.src.evaluator.validation import ValidationEngine
 
 # Create dataset
 dataset = EvalDataset(
@@ -150,7 +152,7 @@ dataset = EvalDataset(
 )
 
 # Run evaluation with RAGAS metrics
-from src.evaluator.metrics import context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size
+from eval.src.evaluator.metrics import context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size
 
 engine = ValidationEngine(
     dataset=dataset,
@@ -163,8 +165,8 @@ Results are stored in folder named `.results`
 ### Experiment based evaluation
 
 ```python
-from src.controller.options import ExperimentOptions
-from src.controller.manager import Experiment
+from eval.src.controller.options import ExperimentOptions
+from eval.src.controller.manager import Experiment
 
 # Configure experiment
 experiment_options = ExperimentOptions(

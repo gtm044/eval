@@ -253,9 +253,13 @@ if __name__ == '__main__':
         ["Average time per token", f"{seconds_per_token:.4f} seconds"]
     ]
     
-    # Print the table with a nice format
+    # Print the table
     print("\n" + "="*50)
     print("Performance Metrics")
     print("="*50)
     print(tabulate(metrics_data, headers=["Metric", "Value"], numalign="left"))
     print("="*50 + "\n")
+    
+    # Save the questions and answers to a json file
+    with open("generation.json", "w") as f:
+        json.dump({"questions": questions, "answers": answers, "reference_contexts": reference_contexts}, f, indent=4)
