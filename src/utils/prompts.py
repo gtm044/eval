@@ -1,5 +1,46 @@
 # src/utils/prompts.py
 
+import os
+import jinja2
+
+# Set up Jinja environment
+template_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'utils/prompt_templates')
+jinja_env = jinja2.Environment(
+    loader=jinja2.FileSystemLoader(template_dir),
+    autoescape=jinja2.select_autoescape(['html', 'xml'])
+)
+
+# Load templates
+synthetic_query_template = jinja_env.get_template('synthetic_query_prompt.jinja')
+synthetic_valid_answer_template = jinja_env.get_template('synthetic_valid_answer_prompt.jinja')
+synthetic_valid_short_answer_template = jinja_env.get_template('synthetic_valid_short_answer_prompt.jinja')
+expand_documents_template = jinja_env.get_template('expand_documents_prompt.jinja')
+
+# Get prompt strings (default rendering without parameters)
+synthetic_query_prompt = synthetic_query_template.render()
+synthetic_valid_answer_prompt = synthetic_valid_answer_template.render()
+synthetic_valid_short_answer_prompt = synthetic_valid_short_answer_template.render()
+expand_documents_prompt = expand_documents_template.render()
+
+# Functions to render templates with parameters
+def render_synthetic_query_prompt(**kwargs):
+    """Render the synthetic query prompt with parameters."""
+    return synthetic_query_template.render(**kwargs)
+
+def render_synthetic_valid_answer_prompt(**kwargs):
+    """Render the synthetic valid answer prompt with parameters."""
+    return synthetic_valid_answer_template.render(**kwargs)
+
+def render_synthetic_valid_short_answer_prompt(**kwargs):
+    """Render the synthetic valid short answer prompt with parameters."""
+    return synthetic_valid_short_answer_template.render(**kwargs)
+
+def render_expand_documents_prompt(**kwargs):
+    """Render the expand documents prompt with parameters."""
+    return expand_documents_template.render(**kwargs)
+
+# Original hardcoded prompts for reference
+"""
 synthetic_query_prompt: str = (
     "You are an expert question-answering system provided with a document. You must create a natural, direct question based on information in the document.\n\n"
     
@@ -40,7 +81,7 @@ synthetic_valid_answer_prompt: str = (
 )
 
 # Prompt to generate short and specific answers.
-# synthetic_valid_answer_prompt: str = (
+# synthetic_valid_short_answer_prompt: str = (
 #     "You are an expert question-answering system provided with a <question> and a <document>. You must generate an answer for the provided question. "
 #     "The answer must be answerable within the context of the document. "
 #     "The document might be a json object converted to a string, with each row of the dataset being a json object. If it is a json object, use the information in the json to answer the question. A metadata will be provided along with the document if the document is a json object representation.\n\n"
@@ -57,3 +98,14 @@ expand_documents_prompt: str = (
     "The number of documents to generate is not fixed and is decided by the content of the document, if you reach a point where you can't paraphrase anymore to create more meaningful documents, stop.\n\n"
     "But if there is a number specified in an input field <limit>, you should generate that many documents.\n\n"
 )
+"""
+
+# Example 
+
+# print(render_synthetic_query_prompt(
+#     custom_instructions="",
+#     example_questions=["What is the capital of France?", "What is the capital of Germany?"],
+#     no_question_response="NO_QUESTION_POSSIBLE"
+# ))
+
+# print(synthetic_valid_answer_prompt)

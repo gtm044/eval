@@ -6,7 +6,14 @@ import json
 import os
 import pandas as pd
 from tqdm import tqdm
-from src.utils.prompts import synthetic_query_prompt, synthetic_valid_answer_prompt, expand_documents_prompt
+from src.utils.prompts import (
+    synthetic_query_prompt, 
+    synthetic_valid_answer_prompt, 
+    expand_documents_prompt,
+    render_synthetic_query_prompt,
+    render_synthetic_valid_answer_prompt,
+    render_expand_documents_prompt
+)
 
 load_dotenv()
 
