@@ -137,7 +137,7 @@ class TestEvalDataset(unittest.TestCase):
             dataset.to_json(filename=temp_filename)
             
             # Load the dataset from the JSON file
-            loaded_dataset = EvalDataset.from_json(temp_filename)
+            loaded_dataset = EvalDataset.from_json(json_path=temp_filename)
             
             # Verify the loaded dataset
             self.assertEqual(len(loaded_dataset.questions), 3)

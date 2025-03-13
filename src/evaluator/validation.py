@@ -44,15 +44,26 @@ class ValidationEngine:
             tuple: (results_dict, metrics_list, json_schema)
         """ 
         # Prepare dataset for single-turn evaluation
-        golden_dataset = Dataset.from_dict(
-            {
-                "question": self.dataset.questions,
-                "answer": self.dataset.responses,
-                "contexts": self.dataset.retrieved_contexts,
-                "ground_truths": self.dataset.answers,
-                "reference": self.dataset.reference_contexts
-            }
-        )
+        dataset_dict = {}
+        
+        if self.dataset.questions is not None:
+            dataset_dict["question"] = self.dataset.questions
+        
+        if self.dataset.responses is not None:
+            dataset_dict["answer"] = self.dataset.responses
+        
+        if self.dataset.retrieved_contexts is not None:
+            dataset_dict["contexts"] = self.dataset.retrieved_contexts
+        
+        if self.dataset.answers is not None:
+            dataset_dict["ground_truths"] = self.dataset.answers
+        
+        if self.dataset.reference_contexts is not None:
+            dataset_dict["reference"] = self.dataset.reference_contexts
+        
+        golden_dataset = Dataset.from_dict(dataset_dict)
+        
+        avg_chunk_size_result = None
             
         # Check if avg_chunk_size is in the metrics list, if present, remove it calculate the avg chunk size
         if self.metrics:
@@ -61,7 +72,6 @@ class ValidationEngine:
                     self.metrics.pop(i)
                     print("Calculating average chunk size...")
                     avg_chunk_size_result = avg_chunk_size([context for context in tqdm(self.dataset.reference_contexts, desc="Processing chunks")])
-            
             results = ragas.evaluate(dataset=golden_dataset, metrics=self.metrics, show_progress=True)
             
         else:
@@ -71,7 +81,8 @@ class ValidationEngine:
         df = results.to_pandas()
         
         # Add the avg chunk size result to the results
-        df["avg_chunk_size"] = avg_chunk_size_result
+        if avg_chunk_size_result is not None:
+            df["avg_chunk_size"] = avg_chunk_size_result
         
         # Create results directory if it doesn't exist
         results_dir = ".results"
@@ -119,7 +130,7 @@ if __name__=='__main__':
     
     # Single-turn evaluation
     metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size]
-    eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics) # Dont provide metrics if you want to use the default metrics
+    eval_engine = ValidationEngine(dataset=_dataset) # Dont provide metrics if you want to use the default metrics
     results, metrics, schema = eval_engine.evaluate()
     print("Single-turn evaluation results:")
     print(json.dumps(results, indent=2))

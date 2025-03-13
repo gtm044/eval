@@ -61,6 +61,7 @@ class EvalDataset(BaseModel):
 
         return data
 
+    @classmethod
     def from_json(cls, json_path):
         """
         Create an EvalDataset from a list of JSON objects.
