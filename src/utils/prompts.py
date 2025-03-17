@@ -15,12 +15,14 @@ synthetic_query_template = jinja_env.get_template('synthetic_query_prompt.jinja'
 synthetic_valid_answer_template = jinja_env.get_template('synthetic_valid_answer_prompt.jinja')
 synthetic_valid_short_answer_template = jinja_env.get_template('synthetic_valid_short_answer_prompt.jinja')
 expand_documents_template = jinja_env.get_template('expand_documents_prompt.jinja')
+parse_langchain_logs_template = jinja_env.get_template('langchain_log_extractor_prompt.jinja')
 
 # Get prompt strings (default rendering without parameters)
 synthetic_query_prompt = synthetic_query_template.render()
 synthetic_valid_answer_prompt = synthetic_valid_answer_template.render()
 synthetic_valid_short_answer_prompt = synthetic_valid_short_answer_template.render()
 expand_documents_prompt = expand_documents_template.render()
+parse_langchain_logs_prompt = parse_langchain_logs_template.render()
 
 # Functions to render templates with parameters
 def render_synthetic_query_prompt(**kwargs):
@@ -38,6 +40,10 @@ def render_synthetic_valid_short_answer_prompt(**kwargs):
 def render_expand_documents_prompt(**kwargs):
     """Render the expand documents prompt with parameters."""
     return expand_documents_template.render(**kwargs)
+
+def render_parse_langchain_logs_prompt(**kwargs):
+    """Render the parse langchain logs prompt with parameters."""
+    return parse_langchain_logs_template.render(**kwargs)
 
 # Original hardcoded prompts for reference
 """

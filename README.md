@@ -55,7 +55,7 @@ pip install .
 
 ## Configuration
 
-The framework uses environment variables for Couchbase and OpenAI configurations. Refer [`.env-template`](.env-template).
+The framework uses environment variables for Couchbase and OpenAI configurations. Refer [`.env.template`](.env.template).
 
 ## Usage
 

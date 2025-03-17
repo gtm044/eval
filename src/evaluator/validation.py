@@ -75,7 +75,34 @@ class ValidationEngine:
             results = ragas.evaluate(dataset=golden_dataset, metrics=self.metrics, show_progress=True)
             
         else:
-            results = ragas.evaluate(dataset=golden_dataset, show_progress=True)
+            # Try to evaluate with default metrics, but handle errors for incompatible metrics
+            try:
+                results = ragas.evaluate(dataset=golden_dataset, show_progress=True)
+            except Exception as e:
+                print(f"Error with default metrics: {e}")
+                # Determine applicable metrics based on available dataset fields
+                applicable_metrics = []
+                
+                # Check for context-based metrics
+                if "contexts" in dataset_dict and "question" in dataset_dict and "answer" in dataset_dict:
+                    from ragas.metrics import answer_relevancy, faithfulness
+                    applicable_metrics.extend([answer_relevancy, faithfulness])
+                
+                # Check for ground truth-based metrics
+                if "ground_truths" in dataset_dict and "answer" in dataset_dict and "reference" in dataset_dict and "question" in dataset_dict:
+                    from ragas.metrics import answer_correctness
+                    applicable_metrics.append(answer_correctness)
+                
+                # Check for reference-based metrics
+                if "question" in dataset_dict and "reference" in dataset_dict and "contexts" in dataset_dict:
+                    from ragas.metrics import context_recall
+                    applicable_metrics.extend([context_recall, context_precision])
+                
+                if not applicable_metrics:
+                    raise ValueError("No applicable metrics found for the provided dataset")
+                
+                print(f"Evaluating with applicable metrics: {[m.name for m in applicable_metrics]}")
+                results = ragas.evaluate(dataset=golden_dataset, metrics=applicable_metrics, show_progress=True)
         
         # Convert to pandas DataFrame
         df = results.to_pandas()
