@@ -7,7 +7,7 @@ import pandas as pd
 import os
 import ragas
 from ragas import evaluate
-from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size
+from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity
 # from ragas.metrics._factual_correctness import FactualCorrectness
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
@@ -64,7 +64,7 @@ class ValidationEngine:
         golden_dataset = Dataset.from_dict(dataset_dict)
         
         avg_chunk_size_result = None
-            
+                    
         # Check if avg_chunk_size is in the metrics list, if present, remove it calculate the avg chunk size
         if self.metrics:
             for i, metric in enumerate(self.metrics):
@@ -85,17 +85,14 @@ class ValidationEngine:
                 
                 # Check for context-based metrics
                 if "contexts" in dataset_dict and "question" in dataset_dict and "answer" in dataset_dict:
-                    from ragas.metrics import answer_relevancy, faithfulness
                     applicable_metrics.extend([answer_relevancy, faithfulness])
                 
                 # Check for ground truth-based metrics
-                if "ground_truths" in dataset_dict and "answer" in dataset_dict and "reference" in dataset_dict and "question" in dataset_dict:
-                    from ragas.metrics import answer_correctness
-                    applicable_metrics.append(answer_correctness)
+                if "ground_truths" in dataset_dict and "answer" in dataset_dict and "question" in dataset_dict:
+                    applicable_metrics.extend([answer_correctness, answer_similarity])
                 
                 # Check for reference-based metrics
                 if "question" in dataset_dict and "reference" in dataset_dict and "contexts" in dataset_dict:
-                    from ragas.metrics import context_recall
                     applicable_metrics.extend([context_recall, context_precision])
                 
                 if not applicable_metrics:
@@ -141,7 +138,7 @@ class ValidationEngine:
             }
         
         print(f"Results saved to {csv_filename} and {json_filename}")
-        return results_dict, self.metrics, json_schema
+        return results_dict, self.metrics if self.metrics else applicable_metrics, json_schema
         
         
 if __name__=='__main__':

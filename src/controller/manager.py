@@ -41,9 +41,8 @@ class Experiment:
             self.load_operator = LoadOperator()
             self.dataset = self.load_operator.retrieve_docs(self.options.dataset_id)
         
-        print(type(self.dataset), isinstance(self.dataset, EvalDataset))
-        if not isinstance(self.dataset, EvalDataset):
-            raise ValueError(f"Failed to load dataset with ID: {self.options.dataset_id}")
+            if not isinstance(self.dataset, EvalDataset):
+                raise ValueError(f"Failed to load dataset with ID: {self.options.dataset_id}")
         
         # Create validation engine and run evaluation
         validation_engine = ValidationEngine(
