@@ -76,7 +76,7 @@ class Experiment:
             "embedding_dimension": self.options.embedding_dimension,
             "llm_model": self.options.llm_model,
             "metrics": self.metric_names,
-            "dataset_size": len(self.output)-1,
+            "dataset_size": len(self.output),
             "dataset_id": self.options.dataset_id,
             "avg_metrics": self.avg_metrics
         }
@@ -218,4 +218,5 @@ if __name__=='__main__':
     print("Testing retrieve functionality...")
     experiment.retrieve(experiment_id="123", collection="experiment2")
     
-    print("Done! Check the .results-123 directory for output files")
+    print("Retrieved experiment data saved to .results-123 directory")
+     

@@ -5,7 +5,7 @@ with open("requirements.txt", "r") as f:
 
 setup(
     name="eval",  # Name of your package
-    version="0.1",  
+    version="0.2",  
     description="RAG evaluation framework",  # Short description
     packages=find_packages(),  # Automatically find packages in the folder
     install_requires=install_requires,
@@ -20,5 +20,5 @@ setup(
     #     "License :: OSI Approved :: MIT License",
     #     "Operating System :: OS Independent",
     # ],
-    python_requires='>=3.12',  # Python version requirement
+    python_requires='>=3.11',  # Python version requirement
 )
