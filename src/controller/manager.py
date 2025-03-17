@@ -52,7 +52,7 @@ class Experiment:
         )
         
         # Run the evaluation
-        self.output, self.metrics, _ = validation_engine.evaluate()
+        self.output, self.metrics, _, self.avg_metrics = validation_engine.evaluate()
         
         # Rename the .results directory created by the the validationEngine to ".results-experiment_id"
         # If the directory exits, don't rename it
@@ -77,7 +77,8 @@ class Experiment:
             "llm_model": self.options.llm_model,
             "metrics": self.metric_names,
             "dataset_size": len(self.output)-1,
-            "dataset_id": self.options.dataset_id
+            "dataset_id": self.options.dataset_id,
+            "avg_metrics": self.avg_metrics
         }
         
         # Add any custom fields from options to metadata

@@ -136,9 +136,15 @@ class ValidationEngine:
             json_schema["items"]["properties"][column] = {
                 "type": "number" if df[column].dtype in ['float64', 'int64'] else "string",
             }
+            
+        # For the metrics that are calculated, find the average of each metric
+        avg_metrics = {}
+        for metric in self.metrics if self.metrics else applicable_metrics:
+            if metric.name in df.columns:
+                avg_metrics[metric.name] = df[metric.name].mean()
         
         print(f"Results saved to {csv_filename} and {json_filename}")
-        return results_dict, self.metrics if self.metrics else applicable_metrics, json_schema
+        return results_dict, self.metrics if self.metrics else applicable_metrics, json_schema, avg_metrics
         
         
 if __name__=='__main__':
@@ -155,11 +161,13 @@ if __name__=='__main__':
     # Single-turn evaluation
     metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size]
     eval_engine = ValidationEngine(dataset=_dataset) # Dont provide metrics if you want to use the default metrics
-    results, metrics, schema = eval_engine.evaluate()
+    results, metrics, schema, avg_metrics = eval_engine.evaluate()
     print("Single-turn evaluation results:")
     print(json.dumps(results, indent=2))
     print("JSON Schema:")
     print(json.dumps(schema, indent=2))
+    print("Average metrics:")
+    print(json.dumps(avg_metrics, indent=2))
     
     ## Note: The avg_chunk_size will be the same for all data points as it is a normalized index. 
     ## Ranges from -inf to 1 (Higher is better)
