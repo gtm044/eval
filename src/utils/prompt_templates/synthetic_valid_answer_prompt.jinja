@@ -1,9 +1,22 @@
-You are an expert question-answering system provided with a <question> and a <document>. You must generate an answer for the provided question. 
-The answer must be answerable within the context of the document. 
+You are an expert question-answering system provided with a <question> and a <document>. You must generate multiple answers for the provided question, catering to different RAG use cases and systems.
+The answers must be answerable within the context of the document. 
 The document might be a JSON object converted to a string, with each row of the dataset being a JSON object. If it is a JSON object, use the information in the JSON to answer the question. A metadata will be provided along with the document if the document is a JSON object representation.
 
 {% if custom_instructions %}{{ custom_instructions }}{% else %}
-Generate a complete, well-formed sentence that directly answers the question. The answer should be concise but should not be a single word or phrase. Instead, it should be structured as a meaningful sentence incorporating necessary details from the document.
+Generate multiple answers with varying levels of detail, if possible:
+1. A concise, direct answer.
+2. A comprehensive answer with explanation.
+3. A detailed answer with supporting evidence from the document.
 {% endif %}
 
-If the question is marked as '{{ no_question_marker|default("NO_QUESTION_POSSIBLE") }}' or if the document does not contain enough information to answer the question provoded, respond with just '{{ no_answer_response|default("NO_ANSWER_POSSIBLE") }}'. 
+All the answers generated should cater to the infromation present in the document, do not add any information not present in the document.
+
+If the question is marked as '{{ no_question_marker|default("NO_QUESTION_POSSIBLE") }}' or if the document does not contain enough information to answer the question provided, respond with just '{{ no_answer_response|default("NO_ANSWER_POSSIBLE") }}'. 
+Always return a JSON object with an "answers" array. If multiple detailed answers aren't possible, include only the concise, direct answer that can be supported by the document. 
+
+Your response must be a valid JSON string with the following structure:
+{
+  "answers": [
+
+  ]
+}

@@ -17,6 +17,16 @@ from src.utils.prompts import (
 
 load_dotenv()
 
+# Problem: 
+# We have a response generator that generates answers given a document and a question.
+# But we  only generate a single answer given a question doc pair.
+# We want to generate multiple answers catering to different RAG use cases and systems.
+
+# Solution: 
+# Modify the prompt to generate multiple answers. Some detailed with explanation of the answer, some concise.
+# Engineer the llm to generate a json string that contains a field called "answers" having a list of all possible answers.
+# Dump the json string to a dict, extract the list of answers and at the end, return the list of list of answers from the `generate_answers` function.
+
 class SyntheticDataGenerator:
     def __init__(self):
         self.api_key = os.environ["OPENAI_API_KEY"]
@@ -94,8 +104,17 @@ class SyntheticDataGenerator:
                 ]
             )
             candidate_answer = completion.choices[0].message.content
-            answers.append(candidate_answer)
-        
+            
+            # Process the candidate answer json string
+            # Remove the ```json from the beginning and end of the string
+            candidate_answer = candidate_answer.replace("```json", "").replace("```", "")
+            
+            # Convert the string to a json object
+            candidate_answer = json.loads(candidate_answer)
+            
+            # Append the answers to the answers list
+            answers.append(candidate_answer["answers"])
+            
         return answers
     
     def synthesize(self, documents: List[str], metadata=None, expand=False):
@@ -124,7 +143,7 @@ class SyntheticDataGenerator:
         
         return {
             "questions": filtered_questions,
-            "answers": [[filtered_answer] for filtered_answer in filtered_answers],
+            "answers": filtered_answers,
             "reference_contexts": filtered_contexts
         }
         
@@ -174,9 +193,8 @@ class SyntheticDataGenerator:
                     documents = [json.dumps(doc) for doc in data]
                 
         return documents
-
     
-if __name__ == '__main__':
+if __name__ == "__main__":
     import time
     import psutil
     import os
@@ -270,3 +288,4 @@ if __name__ == '__main__':
     # Save the questions and answers to a json file
     with open("generation.json", "w") as f:
         json.dump({"questions": questions, "answers": answers, "reference_contexts": reference_contexts}, f, indent=4)
+    
