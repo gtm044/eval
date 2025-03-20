@@ -10,20 +10,20 @@ from src.data.dataset import EvalDataset
 load_dotenv()
 
 def get_default_log_path():
-        """
-        Returns the default log path based on the platform.
-        This matches the logic in the Interceptor class.
-        """
-        import platform
+    """
+    Returns the default log path based on the platform.
+    This matches the logic in the Interceptor class.
+    """
+    import platform
+    
+    if platform.system() == "Darwin":  # macOS
+        default_dir = os.path.expanduser("~/Documents/langchain_logs")
+    elif platform.system() == "Windows":
+        default_dir = os.path.join(os.path.expanduser("~"), "Documents", "langchain_logs")
+    else:  # Other unix
+        default_dir = os.path.expanduser("~/langchain_logs")
         
-        if platform.system() == "Darwin":  # macOS
-            default_dir = os.path.expanduser("~/Documents/langchain_logs")
-        elif platform.system() == "Windows":
-            default_dir = os.path.join(os.path.expanduser("~"), "Documents", "langchain_logs")
-        else:  # Other unix
-            default_dir = os.path.expanduser("~/langchain_logs")
-            
-        return os.path.join(default_dir, "langchain_logs.json")
+    return os.path.join(default_dir, "langchain_logs.json")
 
 
 def parse_and_load():

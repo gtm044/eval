@@ -34,6 +34,8 @@ class ExperimentOptions(BaseModel):
             - faithfulness
             - answer_correctness
             - avg_chunk_size
+            - context_similarity
+            - context_score
         """
     )
     segments: Optional[List[str]] = Field( # Yet to implement
@@ -80,7 +82,7 @@ class ExperimentOptions(BaseModel):
         
         # Validate metric names
         for metric_name in metric_names:
-            if metric_name not in ["context_precision", "context_recall", "answer_relevancy", "faithfulness", "answer_correctness", "avg_chunk_size", "semantic_similarity"]:  
+            if metric_name not in ["context_precision", "context_recall", "answer_relevancy", "faithfulness", "answer_correctness", "avg_chunk_size", "context_similarity", "context_score", "named_entity_score"]:  
                 raise ValueError(f"{metric_name} doesn't exist.")
         
         return v

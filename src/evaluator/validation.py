@@ -7,7 +7,7 @@ import pandas as pd
 import os
 import ragas
 from ragas import evaluate
-from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity
+from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity, context_similarity, context_score
 # from ragas.metrics._factual_correctness import FactualCorrectness
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
@@ -64,15 +64,36 @@ class ValidationEngine:
         golden_dataset = Dataset.from_dict(dataset_dict)
         
         avg_chunk_size_result = None
+        context_similarity_result = None
+        context_score_result = None
+        
+        self.temp_metrics = self.metrics.copy()
                     
         # Check if avg_chunk_size is in the metrics list, if present, remove it calculate the avg chunk size
         if self.metrics:
+            # Create a list to track metrics to remove
+            metrics_to_remove = []
+            
+            # First identify all metrics to remove
             for i, metric in enumerate(self.metrics):
                 if metric.name == "avg_chunk_size":
-                    self.metrics.pop(i)
+                    metrics_to_remove.append(i)
                     print("Calculating average chunk size...")
                     avg_chunk_size_result = avg_chunk_size([context for context in tqdm(self.dataset.reference_contexts, desc="Processing chunks")])
-            results = ragas.evaluate(dataset=golden_dataset, metrics=self.metrics, show_progress=True)
+                elif metric.name == "context_similarity":
+                    metrics_to_remove.append(i)
+                    print("Calculating context similarity...")
+                    context_similarity_result = context_similarity(self.dataset.reference_contexts, self.dataset.retrieved_contexts)
+                elif metric.name == "context_score":
+                    metrics_to_remove.append(i)
+                    print("Calculating context score...")
+                    context_score_result = context_score(self.dataset.reference_contexts, self.dataset.retrieved_contexts)
+            
+            # Remove metrics in reverse order to avoid index shifting
+            for i in sorted(metrics_to_remove, reverse=True):
+                self.temp_metrics.pop(i)
+                
+            results = ragas.evaluate(dataset=golden_dataset, metrics=self.temp_metrics, show_progress=True)
             
         else:
             # Try to evaluate with default metrics, but handle errors for incompatible metrics
@@ -108,6 +129,14 @@ class ValidationEngine:
         if avg_chunk_size_result is not None:
             df["avg_chunk_size"] = avg_chunk_size_result
         
+        # Add the context similarity result to the results
+        if context_similarity_result is not None:
+            df["context_similarity"] = context_similarity_result
+        
+        # Add the context score result to the results
+        if context_score_result is not None:
+            df["context_score"] = context_score_result
+            
         # Create results directory if it doesn't exist
         results_dir = ".results"
         os.makedirs(results_dir, exist_ok=True)
@@ -139,12 +168,20 @@ class ValidationEngine:
             
         # For the metrics that are calculated, find the average of each metric
         avg_metrics = {}
-        for metric in self.metrics if self.metrics else applicable_metrics:
-            if metric.name in df.columns:
-                avg_metrics[metric.name] = df[metric.name].mean()
+        if self.metrics:
+            for metric in self.metrics:
+                if metric.name in df.columns:
+                    avg_metrics[metric.name] = df[metric.name].mean()
+        else:
+            for metric in applicable_metrics:
+                if metric.name in df.columns:
+                    avg_metrics[metric.name] = df[metric.name].mean()
         
         print(f"Results saved to {csv_filename} and {json_filename}")
-        return results_dict, self.metrics if self.metrics else applicable_metrics, json_schema, avg_metrics
+        if self.metrics:
+            return results_dict, self.metrics, json_schema, avg_metrics
+        else:
+            return results_dict, applicable_metrics, json_schema, avg_metrics
         
         
 if __name__=='__main__':
@@ -159,8 +196,8 @@ if __name__=='__main__':
     _dataset = EvalDataset(**data)
     
     # Single-turn evaluation
-    metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size]
-    eval_engine = ValidationEngine(dataset=_dataset) # Dont provide metrics if you want to use the default metrics
+    metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size, context_similarity, context_score]
+    eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics) # Dont provide metrics if you want to use the default metrics
     results, metrics, schema, avg_metrics = eval_engine.evaluate()
     print("Single-turn evaluation results:")
     print(json.dumps(results, indent=2))

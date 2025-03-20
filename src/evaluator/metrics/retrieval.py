@@ -12,19 +12,21 @@ from src.utils.nlp import cosine_similarity, rouge_n, rouge_l, ner
 import argparse
 import numpy as np
 
-def embedding_similarity(questions, retrieved_contexts, method="cosine"):
+def context_similarity(reference_contexts, retrieved_contexts, method="cosine"):
     """
     Calculates the embedding similarity between reference contexts and the retrieved contexts.
     """
     similarities = []
+    # Retrieved contexts are a list of list of strings, make it a list of strings, concatenate strings in each list
+    retrieved_contexts = [' '.join(context) for context in retrieved_contexts]
     if method=="cosine":
-        for reference, retrieved in zip(questions, retrieved_contexts):
+        for reference, retrieved in zip(reference_contexts, retrieved_contexts):
             ref_embedding = openai_embedding(reference)
             retrieved_embedding = openai_embedding(retrieved)
             similarity = cosine_similarity(ref_embedding, retrieved_embedding)
             similarities.append(round(similarity.item(), 2))
     elif method=="dot":
-        for reference, retrieved in zip(questions, retrieved_contexts):
+        for reference, retrieved in zip(reference_contexts, retrieved_contexts):
             ref_embedding = openai_embedding(reference)
             retrieved_embedding = openai_embedding(retrieved)
             similarity = np.dot(ref_embedding, retrieved_embedding)
@@ -37,12 +39,14 @@ def context_score(reference_contexts, retrieved_contexts):
     Returns the F1 score for ROUGE-N and ROUGE-L
     """
     scores = []
+    # Retrieved contexts are a list of list of strings, make it a list of strings, concatenate strings in each list
+    retrieved_contexts = [' '.join(context) for context in retrieved_contexts]
     for reference, retrieved in zip(reference_contexts, retrieved_contexts):
         # Find the ROUGE precision between the reference and retrieved contexts
         _rouge_n = rouge_n(retrieved, reference, n=3)
         _rouge_l = rouge_l(retrieved, reference)
-        rouge_score = [round(_rouge_n, 2), round(_rouge_l, 2)]
-        scores.append(rouge_score)
+        # rouge_score = [round(_rouge_n, 2), round(_rouge_l, 2)]
+        scores.append(_rouge_l)
     return scores
 
 
@@ -69,6 +73,11 @@ def retrieval_accuracy(reference_contexts, retrived_contexts):
         if reference == retrieved:
             accuracy += 1
     return round(accuracy/len(reference_contexts), 2)
+
+# Function attributes
+context_similarity.name = "context_similarity"
+context_score.name = "context_score"
+named_entity_score.name = "named_entity_score"
             
             
 if __name__=='__main__':
@@ -88,9 +97,9 @@ if __name__=='__main__':
     ]
     if args.test=="embedding_similarity":
         if args.method=="cosine":
-            print(embedding_similarity(reference_contexts, retrieved_contexts, method="cosine"))
+            print(context_similarity(reference_contexts, retrieved_contexts, method="cosine"))
         elif args.method=="dot":
-            print(embedding_similarity(reference_contexts, retrieved_contexts, method="dot"))
+            print(context_similarity(reference_contexts, retrieved_contexts, method="dot"))
     
     if args.test=="context_score":
         scores = context_score(reference_contexts, retrieved_contexts)

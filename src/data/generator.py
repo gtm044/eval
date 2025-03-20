@@ -80,7 +80,7 @@ class SyntheticDataGenerator:
 
     def generate_answers(self, documents: List[str], questions: List[str], metadata: str = None) -> List[str]:
         """
-        Generate answers with LLM and verify with BM25
+        Generate answers with LLM
         """
         answers = []
         metadata = metadata if metadata is not None else "Document is plain text, hence no metadata is provided."
