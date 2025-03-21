@@ -82,8 +82,19 @@ class Experiment:
         }
         
         # Add any custom fields from options to metadata
-        for field_name, field_value in self.options.__dict__.items():
-            if field_name not in self.metadata and field_name != "__fields_set__" and field_name != "metrics":
+        # BaseModel objects don't use __dict__ directly, use model_dump() instead
+        options_dict = self.options.model_dump()
+        for field_name, field_value in options_dict.items():
+            if (field_name not in self.metadata and 
+                field_name != "metrics" and 
+                field_name != "experiment_id" and
+                field_name != "dataset_id" and
+                field_name != "chunk_size" and
+                field_name != "chunk_overlap" and
+                field_name != "embedding_model" and
+                field_name != "embedding_dimension" and
+                field_name != "llm_model" and
+                field_name != "segments"):
                 self.metadata[field_name] = field_value
         
         # Save the metadata to the results directory

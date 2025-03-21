@@ -125,6 +125,9 @@ class ValidationEngine:
         # Convert to pandas DataFrame
         df = results.to_pandas()
         
+        if self.dataset.answers is not None:
+            df["ground_truth_answer"] = self.dataset.answers
+        
         # Add the avg chunk size result to the results
         if avg_chunk_size_result is not None:
             df["avg_chunk_size"] = avg_chunk_size_result
