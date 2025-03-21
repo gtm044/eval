@@ -117,6 +117,10 @@ class EvalDataset(BaseModel):
         data = info.data  
         # Filter out None fields
         filtered_data = {field: data[field] for field in {"questions", "answers", "responses", "reference_contexts", "retrieved_contexts"} if field in data and data[field] is not None}
+        # Log the length of each field in the filtered data
+        error_message = ""
+        for field, value in filtered_data.items():
+            error_message += f"{field}: {len(value)}\n"
         # If at least one field is provided, check lengths
         if filtered_data:
             # Get the length of each field, accounting for answers and retrieved_contexts being lists of lists
@@ -125,7 +129,7 @@ class EvalDataset(BaseModel):
                 lengths.append(len(value))
                     
             if len(set(lengths)) != 1:
-                raise ValueError("All input lists must be of the same length")
+                raise ValueError("All input lists must be of the same length\n" + error_message)
         return v
     
     
