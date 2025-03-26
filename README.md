@@ -208,5 +208,3 @@ Results are stored in `.results-<experiment_id>`
 3. **Agentic Evaluation**
     - Tool call evaluation.
     - Node transition evaluation.
-
-oi

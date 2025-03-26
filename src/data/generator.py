@@ -17,44 +17,35 @@ from src.utils.prompts import (
 
 load_dotenv()
 
-# Problem: 
-# We have a response generator that generates answers given a document and a question.
-# But we  only generate a single answer given a question doc pair.
-# We want to generate multiple answers catering to different RAG use cases and systems.
-
-# Solution: 
-# Modify the prompt to generate multiple answers. Some detailed with explanation of the answer, some concise.
-# Engineer the llm to generate a json string that contains a field called "answers" having a list of all possible answers.
-# Dump the json string to a dict, extract the list of answers and at the end, return the list of list of answers from the `generate_answers` function.
-
 class SyntheticDataGenerator:
     def __init__(self):
         self.api_key = os.environ["OPENAI_API_KEY"]
         self.openai = OpenAI(api_key=self.api_key)
 
-    def generate_questions(self, documents: List[str], metadata: str = None) -> List[str]:
+    def generate_questions(self, documents: List[str], answers: List[List[str]], metadata: str = None) -> List[str]:
         """
-        Generate questions for the provided documents.
+        Generate questions for the provided documents and their corresponding answers.
         Maintains conversation history for the previous 10 question generations.
         """
         metadata = metadata if metadata is not None else "Document is plain text, hence no metadata is provided."
         questions = []
         conversation_history = []
         
-        for document in tqdm(documents, desc="Generating questions"):
-            # Build messages with conversation history
+        for document, answer_list in tqdm(zip(documents, answers), desc="Generating questions"):
+            answer_json = json.dumps({"answers": answer_list})
+            
             messages = [
                 {
                     "role": "developer",
                     "content": synthetic_query_prompt
                 }
             ]
-            # Add conversation history (up to 10 previous exchanges)
+            # Add conversation history
             messages.extend(conversation_history)
             # Add current document request
             messages.append({
                 "role": "user",
-                "content": f"Document: {document}\n\nMetadata: {metadata}"
+                "content": f"Document: {document}\n\nMetadata: {metadata}\n\nAnswer: {answer_json}"
             })
             # Generate question
             completion = self.openai.chat.completions.create(
@@ -63,33 +54,31 @@ class SyntheticDataGenerator:
             )            
             response = completion.choices[0].message
             questions.append(response.content) 
-            # Update conversation history
+            # Conversation history
             conversation_history.append({
                 "role": "user",
-                "content": f"Document: {document}\n\nMetadata: {metadata}"
+                "content": f"Document: {document}\n\nMetadata: {metadata}\n\nAnswer: {answer_json}"
             })
             conversation_history.append({
                 "role": "assistant",
                 "content": response.content
             })            
-            # Keep only the last 10 exchanges (20 messages - user and assistant pairs)
+            # Keep only the last 10 exchanges
             if len(conversation_history) > 20:
                 conversation_history = conversation_history[-20:]
                 
         return questions
 
-    def generate_answers(self, documents: List[str], questions: List[str], metadata: str = None) -> List[str]:
+    def generate_answers(self, documents: List[str],  metadata: str = None) -> List[List[str]]:
         """
-        Generate answers with LLM
+        Generate multiple answers with varying levels of detail for each question-document pair.
+        Returns a list of lists, where each inner list contains different forms of answers.
         """
         answers = []
         metadata = metadata if metadata is not None else "Document is plain text, hence no metadata is provided."
         
-        for question, document in tqdm(zip(questions, documents), desc="Generating answers", total=len(questions)):
+        for document in tqdm(documents, desc="Generating answers", total=len(documents)):
             # Generate candidate answer with LLM
-            if question == "NO_QUESTION_POSSIBLE": # Dont generate answer for the tuple if question is "NO_QUESTION_POSSIBLE"
-                answers.append("NO_ANSWER_POSSIBLE")
-                continue
             completion = self.openai.chat.completions.create(
                 model = "gpt-4o",
                 messages = [
@@ -99,7 +88,7 @@ class SyntheticDataGenerator:
                     },
                     {
                         "role": "user",
-                        "content": f"Document: {document}\n\nMetadata: {metadata}\n\nQuestion: {question}"
+                        "content": f"Document: {document}\n\nMetadata: {metadata}\n\n"
                     }
                 ]
             )
@@ -111,8 +100,6 @@ class SyntheticDataGenerator:
             
             # Convert the string to a json object
             candidate_answer = json.loads(candidate_answer)
-            
-            # Append the answers to the answers list
             answers.append(candidate_answer["answers"])
             
         return answers
@@ -122,19 +109,21 @@ class SyntheticDataGenerator:
         Synthesize questions and answers for the provided documents.
         Returns:
             questions: List[str] -> List of questions
-            answers: List[List[str]] -> List of list of answers
+            answers: List[List[str]] -> List of list of answers (each inner list contains different forms of answers)
             reference_contexts: List[str] -> List of reference contexts
         """
         reference_contexts = documents
         
         print("Starting synthesis...")
-        questions = self.generate_questions(documents, metadata)
-        answers = self.generate_answers(documents, questions, metadata)        
+        # First generate answers for each document
+        answers = self.generate_answers(documents, metadata)
+        # Then generate questions based on documents and their answers
+        questions = self.generate_questions(documents, answers, metadata)
                 
         # Filter out data points where question or answer is "NULL"
         valid_indices = []
         for i, (question, answer) in enumerate(zip(questions, answers)):
-            if question != "NO_QUESTION_POSSIBLE" or answer != "NO_ANSWER_POSSIBLE":
+            if question != "NO_QUESTION_POSSIBLE":
                 valid_indices.append(i)
         
         filtered_questions = [questions[i] for i in valid_indices]
@@ -288,4 +277,3 @@ if __name__ == "__main__":
     # Save the questions and answers to a json file
     with open("generation.json", "w") as f:
         json.dump({"questions": questions, "answers": answers, "reference_contexts": reference_contexts}, f, indent=4)
-    

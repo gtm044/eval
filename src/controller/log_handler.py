@@ -27,7 +27,51 @@ class LogHandler:
         self.scope_name = scope_name
         self.collection_name = collection_name
         
-    def retrieve_logs(self, session_id):
+    def retrieve_logs(self, session_id, catalog_folder=None):
+        
+        if catalog_folder:
+            # The catalog folder contains a file called "llm-activity.log" -> contains all the logs (analogous to the couchbase collection)
+            # File contains a set of dicts, each representing a log entry
+            with open(os.path.join(catalog_folder, "llm-activity.log"), "r") as f:
+                logs = f.readlines()
+                
+            # Parse the logs into a list of dicts
+            logs = [json.loads(log) for log in logs]
+            
+            # Filter the logs for the corresponding session id
+            logs = [log for log in logs if log["session"] == session_id]
+            
+            # Remove duplicate rows ignoring the field 'timestamp'
+            seen = set()
+            unique_data = []
+            for item in logs:
+                key = frozenset((k, str(v)) for k, v in item.items() if k != 'timestamp')
+                if key not in seen: 
+                    seen.add(key)
+                    unique_data.append(item)
+                    
+            # Order the unique_data by timestamp in ascending order
+            unique_data = sorted(unique_data, key=lambda x: x['timestamp'])
+            
+            # Dump 
+            with open(f"logs2_{session_id}.json", "w") as f:
+                json.dump(unique_data, f, indent=4)
+                
+            print(len(unique_data))
+            
+            # Print the number of documents with the content.kwargs.content with the value "What type of room is offered in the \"Clean & quiet apt home by the park\"?"
+            count = 0
+            for item in unique_data:
+                for key, value in item.items():
+                    if key == "content" and "kwargs" in value and "content" in value["kwargs"]:
+                        if value["kwargs"]["content"] == "What type of room is offered in the \"Clean & quiet apt home by the park\"?":
+                            count += 1
+                            
+            print(count)
+            
+            
+            return unique_data
+        
         has_cert_file = os.getenv("has_cert_file") or False
         
         # Connect to the Couchbase cluster
@@ -52,7 +96,6 @@ class LogHandler:
             return None
         
         # _ = self.cluster.query(f"CREATE PRIMARY INDEX ON `{self.bucket_name}`")
-
         # index_query = f"CREATE INDEX timestamp_index ON `{self.bucket_name}`.`{self.scope_name}`.`{self.collection_name}`(timestamp)"
         # _ = self.cluster.query(index_query)
         
@@ -86,4 +129,4 @@ class LogHandler:
     
 if __name__ == "__main__":
     log_handler = LogHandler(cluster_url="couchbase://localhost", username="Administrator", password="password", bucket_name="travel-sample", scope_name="agent_activity", collection_name="raw_logs")
-    log_handler.retrieve_logs("doc2")
+    log_handler.retrieve_logs("doc2", catalog_folder = "/Users/goutham.krishnan/Documents/Work/cwd_eval/chat-with-data/.agent-activity")
