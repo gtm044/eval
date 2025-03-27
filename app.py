@@ -110,16 +110,17 @@ if option == "Data Generation":
                     st.session_state.data_generation_completed = True
                     st.session_state.generated_data = generated_data
                     
-                    # Create EvalDataset and store it
-                    dataset = EvalDataset(
-                        questions=generated_data["questions"],
-                        answers=generated_data["answers"],
-                        reference_contexts=generated_data["reference_contexts"]
-                    )
+                    dataset = {
+                        "questions": st.session_state.generated_data["questions"],
+                        "answers": st.session_state.generated_data["answers"],
+                        "reference_contexts": st.session_state.generated_data["reference_contexts"]
+                    }
+                    
                     st.session_state.generated_dataset = dataset
                     
                     # Save to JSON for download
-                    dataset.to_json("generated_dataset.json")
+                    with open("generated_dataset.json", "w") as f:
+                        json.dump(st.session_state.generated_dataset, f)
                     
                     # Clean up
                     os.remove(f"temp_upload.{file_format}")
@@ -130,7 +131,7 @@ if option == "Data Generation":
         
         # Display generated data if available
         if st.session_state.data_generation_completed and st.session_state.generated_data:
-            generated_data = st.session_state.generated_data
+            generated_data = st.session_state.generated_data 
             
             # Display success message
             st.success(f"Successfully generated {len(generated_data['questions'])} question-answer pairs!")
@@ -149,7 +150,7 @@ if option == "Data Generation":
             
             st.dataframe(pd.DataFrame(data_for_display))
             
-            # Offer download button
+            # Download button
             with open("generated_dataset.json", "r") as f:
                 st.download_button(
                     label="Download Dataset",
@@ -222,6 +223,7 @@ if option == "Data Generation":
             # Offer download button
             with open("generated_dataset.json", "r") as f:
                 st.download_button(
+                    key = "download_generated_dataset",
                     label="Download Dataset",
                     data=f,
                     file_name="rag_eval_dataset.json",
