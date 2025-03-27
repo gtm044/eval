@@ -1,0 +1,1331 @@
+import streamlit as st
+import os
+import pandas as pd
+import json
+from dotenv import load_dotenv
+from src.data.dataset import EvalDataset
+from src.data.generator import SyntheticDataGenerator
+from src.controller.options import ExperimentOptions
+from src.controller.manager import Experiment
+from src.evaluator.metrics import (
+    faithfulness, 
+    answer_relevancy, 
+    context_recall, 
+    context_precision, 
+    answer_correctness, 
+    avg_chunk_size, 
+    context_similarity, 
+    context_score,
+    named_entity_score
+)
+from src.evaluator.validation import ValidationEngine
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+
+# Load environment variables
+load_dotenv()
+
+# Set page config
+st.set_page_config(
+    page_title="RAG Evaluation Framework",
+    page_icon="🧪",
+    layout="wide"
+)
+
+# Sidebar 
+with st.sidebar:
+    st.title("RAG Evaluation Framework")
+    st.markdown("A comprehensive framework for evaluating RAG systems")
+    
+    option = st.radio(
+        "Choose functionality:",
+        ["Data Generation", "Evaluation", "Experiment", "Result Analysis", "Compare Experiments"]
+    )
+
+# Main content
+if option == "Data Generation":
+    st.title("Synthetic Data Generation")
+    
+    # Input tabs
+    tab1, tab2 = st.tabs(["From CSV/JSON", "From Raw Text"])
+    
+    with tab1:
+        st.header("Generate from CSV/JSON")
+        file_format = st.selectbox("File format", ["csv", "json"])
+        
+        uploaded_file = st.file_uploader(f"Upload {file_format} file", type=[file_format])
+        
+        if file_format == "json" and uploaded_file is not None:
+            field = st.text_input("Field name in JSON to use (optional)")
+        
+        metadata = st.text_area("Metadata description (helps in generation)", 
+                               placeholder="E.g., 'Document contains product descriptions with fields: name, description, price, and category.'")
+        
+        limit = st.number_input("Limit number of rows to process (optional)", min_value=1, max_value=100, value=10)
+        
+        if uploaded_file is not None:
+            if st.button("Generate Data", key="generate_csv_json"):
+                try:
+                    # Save the uploaded file
+                    with open(f"temp_upload.{file_format}", "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Write metadata to file
+                    with open("temp_metadata.txt", "w") as f:
+                        f.write(metadata)
+                    
+                    # Initialize the generator
+                    generator = SyntheticDataGenerator()
+                    
+                    with st.spinner("Generating synthetic data..."):
+                        if file_format == "csv":
+                            generated_data = generator.synthesize_from_csv(
+                                path="temp_upload.csv",
+                                metadata=metadata
+                            )
+                        else:  # json
+                            field_param = field if field else None
+                            documents = generator.load_from_json(
+                                path="temp_upload.json",
+                                field=field_param
+                            )
+                            # Limit the number of documents
+                            documents = documents[:limit]
+                            generated_data = generator.synthesize(
+                                documents=documents,
+                                metadata=metadata
+                            )
+                    
+                    # Display generated data
+                    st.success(f"Successfully generated {len(generated_data['questions'])} question-answer pairs!")
+                    
+                    # Create DataFrame for display
+                    data_for_display = []
+                    for i, (q, a, ctx) in enumerate(zip(
+                            generated_data["questions"], 
+                            generated_data["answers"], 
+                            generated_data["reference_contexts"])):
+                        data_for_display.append({
+                            "Question": q,
+                            "Answers": str(a),
+                            "Context": ctx[:100] + "..." if len(ctx) > 100 else ctx
+                        })
+                    
+                    st.dataframe(pd.DataFrame(data_for_display))
+                    
+                    # Create EvalDataset and offer download
+                    dataset = EvalDataset(
+                        questions=generated_data["questions"],
+                        answers=generated_data["answers"],
+                        reference_contexts=generated_data["reference_contexts"]
+                    )
+                    
+                    # Save to JSON for download
+                    dataset.to_json("generated_dataset.json")
+                    
+                    with open("generated_dataset.json", "r") as f:
+                        st.download_button(
+                            label="Download Dataset",
+                            data=f,
+                            file_name="rag_eval_dataset.json",
+                            mime="application/json"
+                        )
+                    
+                    # Clean up
+                    os.remove(f"temp_upload.{file_format}")
+                    os.remove("temp_metadata.txt")
+                    os.remove("generated_dataset.json")
+                    
+                except Exception as e:
+                    st.error(f"Error generating data: {str(e)}")
+    
+    with tab2:
+        st.header("Generate from Raw Text")
+        
+        raw_text = st.text_area("Enter raw text documents (one per line)", height=200)
+        metadata = st.text_area("Metadata description (helps in generation)", 
+                                placeholder="E.g., 'Documents are technical articles about machine learning.'")
+        
+        if st.button("Generate Data", key="generate_raw_text") and raw_text:
+            try:
+                # Parse input into documents
+                documents = [doc.strip() for doc in raw_text.split("\n") if doc.strip()]
+                
+                # Initialize the generator
+                generator = SyntheticDataGenerator()
+                
+                with st.spinner("Generating synthetic data..."):
+                    generated_data = generator.synthesize(
+                        documents=documents,
+                        metadata=metadata
+                    )
+                
+                # Display generated data
+                st.success(f"Successfully generated {len(generated_data['questions'])} question-answer pairs!")
+                
+                # Create DataFrame for display
+                data_for_display = []
+                for i, (q, a, ctx) in enumerate(zip(
+                        generated_data["questions"], 
+                        generated_data["answers"], 
+                        generated_data["reference_contexts"])):
+                    data_for_display.append({
+                        "Question": q,
+                        "Answers": str(a),
+                        "Context": ctx[:100] + "..." if len(ctx) > 100 else ctx
+                    })
+                
+                st.dataframe(pd.DataFrame(data_for_display))
+                
+                # Create EvalDataset and offer download
+                dataset = EvalDataset(
+                    questions=generated_data["questions"],
+                    answers=generated_data["answers"],
+                    reference_contexts=generated_data["reference_contexts"]
+                )
+                
+                # Save to JSON for download
+                dataset.to_json("generated_dataset.json")
+                
+                with open("generated_dataset.json", "r") as f:
+                    st.download_button(
+                        label="Download Dataset",
+                        data=f,
+                        file_name="rag_eval_dataset.json",
+                        mime="application/json"
+                    )
+                
+                # Clean up
+                os.remove("generated_dataset.json")
+                
+            except Exception as e:
+                st.error(f"Error generating data: {str(e)}")
+
+elif option == "Evaluation":
+    st.title("RAG System Evaluation")
+    
+    uploaded_file = st.file_uploader("Upload evaluation dataset (JSON)", type=["json"])
+    
+    if uploaded_file is not None:
+        try:
+            # Save the uploaded file
+            with open("temp_dataset.json", "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            # Load dataset
+            dataset = EvalDataset.from_json("temp_dataset.json")
+            
+            # Show dataset preview
+            st.subheader("Dataset Preview")
+            
+            # Create DataFrame for display
+            data_preview = []
+            for i in range(min(5, len(dataset.questions) if dataset.questions else 0)):
+                preview = {"Question": dataset.questions[i] if dataset.questions else "N/A"}
+                
+                if dataset.answers:
+                    preview["Ground Truth"] = str(dataset.answers[i])
+                
+                if dataset.responses:
+                    preview["Response"] = dataset.responses[i]
+                
+                if dataset.reference_contexts:
+                    preview["Reference Context"] = dataset.reference_contexts[i][:100] + "..." if len(dataset.reference_contexts[i]) > 100 else dataset.reference_contexts[i]
+                
+                if dataset.retrieved_contexts:
+                    preview["Retrieved Context"] = str(dataset.retrieved_contexts[i])
+                
+                data_preview.append(preview)
+            
+            st.dataframe(pd.DataFrame(data_preview))
+            
+            # Metrics selection
+            st.subheader("Select Evaluation Metrics")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                use_faithfulness = st.checkbox("Faithfulness", value=True)
+                use_answer_relevancy = st.checkbox("Answer Relevancy", value=True)
+                use_context_recall = st.checkbox("Context Recall", value=True)
+                use_context_precision = st.checkbox("Context Precision", value=True)
+            
+            with col2:
+                use_answer_correctness = st.checkbox("Answer Correctness", value=True)
+                use_avg_chunk_size = st.checkbox("Average Chunk Size", value=True)
+                use_context_similarity = st.checkbox("Context Similarity", value=True)
+                use_context_score = st.checkbox("Context Score", value=True)
+            
+            if st.button("Run Evaluation", key="run_evaluation"):
+                # Prepare metrics list
+                metrics = []
+                if use_faithfulness: metrics.append(faithfulness)
+                if use_answer_relevancy: metrics.append(answer_relevancy)
+                if use_context_recall: metrics.append(context_recall)
+                if use_context_precision: metrics.append(context_precision)
+                if use_answer_correctness: metrics.append(answer_correctness)
+                if use_avg_chunk_size: metrics.append(avg_chunk_size)
+                if use_context_similarity: metrics.append(context_similarity)
+                if use_context_score: metrics.append(context_score)
+                
+                with st.spinner("Running evaluation..."):
+                    # Run evaluation
+                    engine = ValidationEngine(dataset=dataset, metrics=metrics)
+                    results, metrics_objs, schema, avg_metrics = engine.evaluate()
+                
+                # Display results
+                st.subheader("Evaluation Results")
+                
+                # Display average metrics
+                st.write("Average Metrics:")
+                metrics_df = pd.DataFrame([avg_metrics])
+                st.dataframe(metrics_df)
+                
+                # Display detailed results
+                st.write("Detailed Results:")
+                results_df = pd.DataFrame(results)
+                st.dataframe(results_df)
+                
+                # Offer download of results
+                with open(".results/results.json", "r") as f:
+                    st.download_button(
+                        label="Download Results (JSON)",
+                        data=f,
+                        file_name="evaluation_results.json",
+                        mime="application/json"
+                    )
+                
+                with open(".results/results.csv", "r") as f:
+                    st.download_button(
+                        label="Download Results (CSV)",
+                        data=f,
+                        file_name="evaluation_results.csv",
+                        mime="text/csv"
+                    )
+            
+            # Clean up
+            os.remove("temp_dataset.json")
+                
+        except Exception as e:
+            st.error(f"Error loading dataset: {str(e)}")
+
+elif option == "Experiment":
+    st.title("Experiment based evaluation")
+    
+    tab1, tab2 = st.tabs(["Create Experiment", "Retrieve Experiment"])
+    
+    with tab1:
+        st.header("Create New Experiment")
+        
+        # Dataset upload
+        uploaded_file = st.file_uploader("Upload evaluation dataset (JSON)", type=["json"])
+        
+        # Experiment configuration
+        st.subheader("Experiment Configuration")
+        
+        experiment_id = st.text_input("Experiment ID", value=f"exp_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            chunk_size = st.number_input("Chunk Size", min_value=1, value=512)
+            chunk_overlap = st.number_input("Chunk Overlap", min_value=0, value=50)
+            embedding_model = st.text_input("Embedding Model", value="sentence-transformers/all-mpnet-base-v2")
+        
+        with col2:
+            embedding_dimension = st.number_input("Embedding Dimension", min_value=1, value=768)
+            llm_model = st.text_input("LLM Model", value="gpt-4o-mini")
+        
+        # Metrics selection
+        st.subheader("Select Evaluation Metrics")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            use_faithfulness = st.checkbox("Faithfulness", value=True, key="exp_faith")
+            use_answer_relevancy = st.checkbox("Answer Relevancy", value=True, key="exp_ans_rel")
+            use_context_recall = st.checkbox("Context Recall", value=True, key="exp_ctx_recall")
+            use_context_precision = st.checkbox("Context Precision", value=True, key="exp_ctx_prec")
+        
+        with col2:
+            use_answer_correctness = st.checkbox("Answer Correctness", value=True, key="exp_ans_corr")
+            use_avg_chunk_size = st.checkbox("Average Chunk Size", value=True, key="exp_chunk_size")
+            use_context_similarity = st.checkbox("Context Similarity", value=True, key="exp_ctx_sim")
+            use_context_score = st.checkbox("Context Score", value=True, key="exp_ctx_score")
+        
+        if uploaded_file is not None and st.button("Create Experiment", key="create_experiment"):
+            try:
+                # Save the uploaded file
+                with open("temp_dataset.json", "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                
+                # Load dataset
+                dataset = EvalDataset.from_json("temp_dataset.json")
+                
+                # Prepare metrics list
+                metrics = []
+                if use_faithfulness: metrics.append(faithfulness)
+                if use_answer_relevancy: metrics.append(answer_relevancy)
+                if use_context_recall: metrics.append(context_recall)
+                if use_context_precision: metrics.append(context_precision)
+                if use_answer_correctness: metrics.append(answer_correctness)
+                if use_avg_chunk_size: metrics.append(avg_chunk_size)
+                if use_context_similarity: metrics.append(context_similarity)
+                if use_context_score: metrics.append(context_score)
+                
+                # Create experiment options
+                options = ExperimentOptions(
+                    experiment_id=experiment_id,
+                    dataset_id=dataset.dataset_id,
+                    metrics=metrics,
+                    chunk_size=chunk_size,
+                    chunk_overlap=chunk_overlap,
+                    embedding_model=embedding_model,
+                    embedding_dimension=embedding_dimension,
+                    llm_model=llm_model
+                )
+                
+                with st.spinner("Running experiment..."):
+                    # Initialize experiment
+                    experiment = Experiment(dataset=dataset, options=options)
+                    
+                    # Load to Couchbase if configured
+                    if all([os.getenv("bucket"), os.getenv("scope"), 
+                           os.getenv("collection"), os.getenv("cluster_url"),
+                           os.getenv("cb_username"), os.getenv("cb_password")]):
+                        experiment.load_to_couchbase()
+                        st.success(f"Experiment data loaded to Couchbase with ID: {experiment_id}")
+                    else:
+                        st.warning("Couchbase environment variables not set. Results saved locally only.")
+                
+                # Display results
+                st.subheader("Experiment Results")
+                
+                # Load and display results
+                results_file = f".results-{experiment_id}/results.json"
+                if os.path.exists(results_file):
+                    with open(results_file, "r") as f:
+                        results = json.load(f)
+                    
+                    # Convert to DataFrame and handle data types
+                    df = pd.DataFrame(results)
+                    
+                    # Select only numeric columns for visualization
+                    numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+                    
+                    # Display metrics
+                    st.subheader("Evaluation Metrics")
+                    metrics = df[numeric_columns].mean()
+                    metrics_df = pd.DataFrame(metrics).T
+                    st.dataframe(metrics_df)
+                    
+                    # Display results table
+                    st.subheader("Detailed Results")
+                    st.dataframe(df)
+                    
+                    # Visualize metrics
+                    st.subheader("Metrics Visualization")
+                    for metric in numeric_columns:
+                        fig = px.histogram(df, x=metric, title=f"Distribution of {metric}")
+                        st.plotly_chart(fig)
+                
+                # Offer download of results
+                with open(f".results-{experiment_id}/experiment_config.json", "r") as f:
+                    st.download_button(
+                        label="Download Experiment Config",
+                        data=f,
+                        file_name=f"experiment_{experiment_id}_config.json",
+                        mime="application/json"
+                    )
+                
+                # Clean up
+                os.remove("temp_dataset.json")
+                
+            except Exception as e:
+                st.error(f"Error creating experiment: {str(e)}")
+    
+    with tab2:
+        st.header("Retrieve Experiment")
+        
+        experiment_id = st.text_input("Enter Experiment ID")
+        collection = st.text_input("Enter Collection Name")
+        
+        if st.button("Retrieve Experiment", key="retrieve_experiment") and experiment_id:
+            try:
+                with st.spinner("Retrieving experiment..."):
+                    # Create experiment instance for retrieval
+                    experiment = Experiment()
+                    experiment.retrieve(experiment_id=experiment_id, collection=collection)
+                
+                # Check if results directory exists
+                experiment_dir = f".results-{experiment_id}"
+                if os.path.exists(experiment_dir):
+                    # Read experiment config
+                    with open(f"{experiment_dir}/experiment_config.json", "r") as f:
+                        config = json.load(f)
+                    
+                    # Display experiment metadata
+                    st.subheader("Experiment Metadata")
+                    st.json(config)
+                    
+                    # Load and display results
+                    results_file = os.path.join(experiment_dir, "results.json")
+                    if os.path.exists(results_file):
+                        with open(results_file, "r") as f:
+                            results = json.load(f)
+                        
+                        # Convert to DataFrame and handle data types
+                        df = pd.DataFrame(results)
+                        
+                        # Select only numeric columns for visualization
+                        numeric_columns = df.select_dtypes(include=['float64', 'int64']).columns
+                        
+                        # Display metrics
+                        st.subheader("Evaluation Metrics")
+                        metrics = df[numeric_columns].mean()
+                        metrics_df = pd.DataFrame(metrics).T
+                        st.dataframe(metrics_df)
+                        
+                        # Display results table
+                        st.subheader("Detailed Results")
+                        st.dataframe(df)
+                        
+                        # Visualize metrics
+                        st.subheader("Metrics Visualization")
+                        for metric in numeric_columns:
+                            fig = px.histogram(df, x=metric, title=f"Distribution of {metric}")
+                            st.plotly_chart(fig)
+                        
+                        # Offer download of results
+                        with open(results_file, "r") as f:
+                            st.download_button(
+                                label="Download Results (JSON)",
+                                data=f,
+                                file_name=f"experiment_{experiment_id}_results.json",
+                                mime="application/json"
+                            )
+                        
+                        if os.path.exists(f"{experiment_dir}/results.csv"):
+                            with open(f"{experiment_dir}/results.csv", "r") as f:
+                                st.download_button(
+                                    label="Download Results (CSV)",
+                                    data=f,
+                                    file_name=f"experiment_{experiment_id}_results.csv",
+                                    mime="text/csv"
+                                )
+                    else:
+                        st.warning(f"No local results found for experiment ID: {experiment_id}")
+                else:
+                    st.warning(f"No local results found for experiment ID: {experiment_id}")
+            except Exception as e:
+                st.error(f"Error retrieving experiment: {str(e)}")
+
+elif option == "Result Analysis":
+    st.title("Analyze Evaluation Results")
+    
+    # Initialize session state variables if they don't exist
+    if 'result_analysis_data_loaded' not in st.session_state:
+        st.session_state.result_analysis_data_loaded = False
+    if 'result_analysis_experiment_id' not in st.session_state:
+        st.session_state.result_analysis_experiment_id = ""
+    if 'result_analysis_config' not in st.session_state:
+        st.session_state.result_analysis_config = None
+    if 'result_analysis_df' not in st.session_state:
+        st.session_state.result_analysis_df = None
+    
+    # Function to clear session state
+    def clear_result_analysis_state():
+        st.session_state.result_analysis_data_loaded = False
+        st.session_state.result_analysis_experiment_id = ""
+        st.session_state.result_analysis_config = None
+        st.session_state.result_analysis_df = None
+    
+    # Function to load data
+    def load_result_data(experiment_id, collection):
+        try:
+            # Check if results directory exists locally
+            experiment_dir = f".results-{experiment_id}"
+            if not os.path.exists(experiment_dir):
+                if collection:
+                    with st.spinner(f"Retrieving experiment {experiment_id} from Couchbase..."):
+                        experiment = Experiment()
+                        experiment.retrieve(experiment_id=experiment_id, collection=collection)
+                else:
+                    st.error(f"Experiment {experiment_id} not found locally. Please provide a collection name to retrieve from Couchbase.")
+                    return False
+            
+            # Check if experiment exists after potential retrieval
+            if os.path.exists(experiment_dir):
+                # Load experiment config
+                with open(f"{experiment_dir}/experiment_config.json", "r") as f:
+                    config = json.load(f)
+                
+                # Load results
+                results_file = os.path.join(experiment_dir, "results.json")
+                if os.path.exists(results_file):
+                    with open(results_file, "r") as f:
+                        results = json.load(f)
+                    
+                    # Store in session state
+                    st.session_state.result_analysis_data_loaded = True
+                    st.session_state.result_analysis_experiment_id = experiment_id
+                    st.session_state.result_analysis_config = config
+                    st.session_state.result_analysis_df = pd.DataFrame(results)
+                    return True
+                else:
+                    st.error(f"Results file not found in the experiment directory: {experiment_dir}")
+                    return False
+            else:
+                st.error(f"Experiment {experiment_id} could not be retrieved.")
+                return False
+        except Exception as e:
+            st.error(f"Error loading results: {str(e)}")
+            return False
+    
+    # Display input form if data is not loaded
+    if not st.session_state.result_analysis_data_loaded:
+        # Input fields for experiment ID and collection
+        col1, col2 = st.columns(2)
+        with col1:
+            experiment_id = st.text_input("Enter Experiment ID")
+        with col2:
+            collection = st.text_input("Collection Name (if retrieving from Couchbase)")
+        
+        # Add button with a unique key
+        if st.button("Load Results", key="load_results_button"):
+            if not experiment_id:
+                st.error("Please enter an Experiment ID to visualize results.")
+            else:
+                load_result_data(experiment_id, collection)
+        
+        st.info("Enter an Experiment ID and click 'Load Results' to visualize evaluation results.")
+    else:
+        # Data is loaded, show analysis UI
+        st.success(f"Loaded experiment: {st.session_state.result_analysis_experiment_id}")
+        
+        # Add a button to load different experiment
+        if st.button("Load Different Experiment", key="change_experiment"):
+            clear_result_analysis_state()
+            st.experimental_rerun()
+        
+        # Access stored data
+        config = st.session_state.result_analysis_config
+        df = st.session_state.result_analysis_df
+        
+        # Display experiment metadata
+        st.subheader("Experiment Metadata")
+        st.json(config)
+        
+        # Create visualization tabs
+        viz_tabs = st.tabs(["Summary Dashboard", "Detailed Metrics", "Full Results"])
+        
+        with viz_tabs[0]:
+            st.subheader("Evaluation Summary")
+            
+            # Extract numeric columns
+            numeric_cols = df.select_dtypes(include=['float64', 'int64']).columns
+            
+            if len(numeric_cols) > 0:
+                # Metrics selector
+                selected_metrics = st.multiselect(
+                    "Select metrics to visualize",
+                    options=list(numeric_cols),
+                    default=list(numeric_cols)[:min(5, len(numeric_cols))],
+                    key="summary_metrics_selector"
+                )
+                
+                if selected_metrics:
+                    # Calculate summary statistics
+                    summary_stats = df[selected_metrics].describe().T.reset_index()
+                    summary_stats = summary_stats.rename(columns={'index': 'Metric'})
+                    
+                    # 1. Overview metrics card
+                    metrics_container = st.container()
+                    cols = st.columns(len(selected_metrics))
+                    
+                    for i, metric in enumerate(selected_metrics):
+                        with cols[i]:
+                            mean_val = df[metric].mean()
+                            median_val = df[metric].median()
+                            st.metric(
+                                label=metric,
+                                value=f"{mean_val:.3f}",
+                                delta=f"Median: {median_val:.3f}"
+                            )
+                    
+                    # 2. Summary statistics table
+                    st.subheader("Summary Statistics")
+                    formatted_summary = summary_stats.style.format({
+                        'mean': '{:.3f}',
+                        'std': '{:.3f}',
+                        'min': '{:.3f}',
+                        '25%': '{:.3f}',
+                        '50%': '{:.3f}',
+                        '75%': '{:.3f}',
+                        'max': '{:.3f}'
+                    })
+                    st.dataframe(formatted_summary)
+                    
+                    # 3. Distribution overview
+                    st.subheader("Metrics Distribution Overview")
+                    
+                    # Create violin plots for selected metrics
+                    fig = go.Figure()
+                    
+                    for metric in selected_metrics:
+                        fig.add_trace(go.Violin(
+                            y=df[metric],
+                            name=metric,
+                            box_visible=True,
+                            meanline_visible=True
+                        ))
+                    
+                    fig.update_layout(
+                        title="Distribution of Selected Metrics",
+                        xaxis_title="Metric",
+                        yaxis_title="Value",
+                        height=500
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    
+                    # 5. Metric Accuracy Analysis (percentage of results meeting quality thresholds)
+                    st.subheader("Metric Quality Analysis")
+                    
+                    # Define quality thresholds for each metric based on domain knowledge
+                    metric_thresholds = {
+                        "context_precision": 0.7,
+                        "context_recall": 0.7,
+                        "answer_relevancy": 0.7,
+                        "faithfulness": 0.8,
+                        "answer_correctness": 0.7,
+                        "avg_chunk_size": 0.5,
+                        "context_similarity": 0.7,
+                        "context_score": 0.7,
+                        "named_entity_score": 0.6,
+                        # Add custom thresholds for other metrics if needed
+                    }
+                    
+                    # For any metrics not in the dictionary, use 0.7 as default threshold
+                    default_threshold = 0.7
+                    
+                    accuracy_data = []
+                    for metric in selected_metrics:
+                        threshold = metric_thresholds.get(metric, default_threshold)
+                        above_threshold = (df[metric] >= threshold).sum()
+                        total_samples = len(df[metric])
+                        accuracy = (above_threshold / total_samples) * 100 if total_samples > 0 else 0
+                        
+                        accuracy_data.append({
+                            "Metric": metric,
+                            "Threshold": threshold,
+                            "Samples Above Threshold": above_threshold,
+                            "Total Samples": total_samples,
+                            "Accuracy (%)": accuracy
+                        })
+                    
+                    accuracy_df = pd.DataFrame(accuracy_data)
+                    
+                    # Create a color scale function for the accuracy column
+                    def highlight_accuracy(val):
+                        if val >= 90:
+                            return 'background-color: rgba(76, 175, 80, 0.7)'  # Strong green
+                        elif val >= 70:
+                            return 'background-color: rgba(76, 175, 80, 0.4)'  # Medium green
+                        elif val >= 50:
+                            return 'background-color: rgba(255, 235, 59, 0.5)'  # Yellow
+                        else:
+                            return 'background-color: rgba(244, 67, 54, 0.4)'  # Red
+                    
+                    # Format and display the dataframe
+                    styled_accuracy_df = accuracy_df.style\
+                        .format({'Accuracy (%)': '{:.2f}', 'Threshold': '{:.2f}'})\
+                        .applymap(highlight_accuracy, subset=['Accuracy (%)'])
+                    
+                    st.dataframe(styled_accuracy_df)
+                    
+                    # Add explanation for metric thresholds
+                    with st.expander("About Metric Thresholds"):
+                        st.markdown("""
+                        ### Metric Quality Thresholds
+                        
+                        The accuracy percentage shows what portion of your dataset meets or exceeds the quality threshold for each metric:
+                        
+                        - **context_precision** (0.7): Measures how precise the retrieved contexts are
+                        - **context_recall** (0.7): Measures how complete the retrieved contexts are
+                        - **answer_relevancy** (0.7): Measures how relevant the response is to the question
+                        - **faithfulness** (0.8): Measures how well the response stays true to the retrieved context
+                        - **answer_correctness** (0.7): Measures how correct the answer is compared to ground truth
+                        - **avg_chunk_size** (0.5): Evaluates optimal chunk sizing (>0.5 is considered acceptable)
+                        - **context_similarity** (0.7): Measures embedding similarity between reference and retrieved contexts
+                        - **context_score** (0.7): Evaluates overall context quality
+                        - **named_entity_score** (0.6): Measures named entity overlap between query and context
+                        
+                        Higher accuracy percentages indicate better overall performance.
+                        """)
+                    
+                    # 6. Visualization of accuracy
+                    fig = px.bar(
+                        accuracy_df,
+                        x="Metric",
+                        y="Accuracy (%)",
+                        color="Accuracy (%)",
+                        color_continuous_scale=["red", "yellow", "green"],
+                        range_color=[0, 100],
+                        title="Metric Quality Analysis",
+                        labels={"Accuracy (%)": "% of Samples Meeting Threshold"}
+                    )
+                    
+                    # Add threshold markers
+                    for i, row in accuracy_df.iterrows():
+                        fig.add_shape(
+                            type="line",
+                            x0=i-0.4, x1=i+0.4,
+                            y0=70, y1=70,
+                            line=dict(color="black", width=2, dash="dash"),
+                            name="Good Performance (70%)"
+                        )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Please select at least one metric to visualize")
+            else:
+                st.warning("No numeric metrics found in the results")
+        
+        with viz_tabs[1]:
+            st.subheader("Detailed Metric Analysis")
+            
+            # Select metric to analyze
+            if len(numeric_cols) > 0:
+                selected_metric = st.selectbox(
+                    "Select metric to analyze",
+                    options=numeric_cols,
+                    key="detailed_metric_selector"
+                )
+                
+                if selected_metric:
+                    # Create detailed visualizations for this metric
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        # Histogram
+                        hist_fig = px.histogram(
+                            df,
+                            x=selected_metric,
+                            title=f"Distribution of {selected_metric}",
+                            marginal="box"  # Add box plot at the margin
+                        )
+                        st.plotly_chart(hist_fig, use_container_width=True)
+                    
+                    with col2:
+                        # CDF (Cumulative Distribution Function)
+                        sorted_data = np.sort(df[selected_metric])
+                        cumulative = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+                        
+                        cdf_fig = go.Figure()
+                        cdf_fig.add_trace(go.Scatter(
+                            x=sorted_data,
+                            y=cumulative,
+                            mode='lines',
+                            name='CDF'
+                        ))
+                        
+                        cdf_fig.update_layout(
+                            title=f"Cumulative Distribution of {selected_metric}",
+                            xaxis_title=selected_metric,
+                            yaxis_title="Probability",
+                            yaxis=dict(range=[0, 1])
+                        )
+                        
+                        st.plotly_chart(cdf_fig, use_container_width=True)
+                    
+                    # Statistics card
+                    st.subheader(f"Statistics for {selected_metric}")
+                    
+                    stats_cols = st.columns(5)
+                    with stats_cols[0]:
+                        st.metric("Mean", f"{df[selected_metric].mean():.3f}")
+                    with stats_cols[1]:
+                        st.metric("Median", f"{df[selected_metric].median():.3f}")
+                    with stats_cols[2]:
+                        st.metric("Std Dev", f"{df[selected_metric].std():.3f}")
+                    with stats_cols[3]:
+                        st.metric("Min", f"{df[selected_metric].min():.3f}")
+                    with stats_cols[4]:
+                        st.metric("Max", f"{df[selected_metric].max():.3f}")
+                    
+                else:
+                    st.warning("Please select a metric to analyze")
+            else:
+                st.warning("No numeric metrics found in the results")
+        
+        with viz_tabs[2]:
+            st.subheader("Full Results")
+            
+            # Filter and search functionality
+            search_term = st.text_input("Search in results", key="search_results")
+            
+            if search_term:
+                # Filter the dataframe based on the search term
+                filtered_df = df[df.astype(str).apply(lambda row: row.str.contains(search_term, case=False).any(), axis=1)]
+                st.dataframe(filtered_df)
+                st.info(f"Found {len(filtered_df)} results matching '{search_term}'")
+            else:
+                st.dataframe(df)
+            
+            # Download options
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="Download as CSV",
+                    data=csv,
+                    file_name=f"results_{st.session_state.result_analysis_experiment_id}.csv",
+                    mime="text/csv",
+                    key="download_csv"
+                )
+            
+            with col2:
+                json_str = df.to_json(orient="records")
+                st.download_button(
+                    label="Download as JSON",
+                    data=json_str,
+                    file_name=f"results_{st.session_state.result_analysis_experiment_id}.json",
+                    mime="application/json",
+                    key="download_json"
+                )
+
+elif option == "Compare Experiments":
+    st.title("Compare Experiments")
+    
+    # Input fields for experiment IDs and collections
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        experiment_id_1 = st.text_input("First Experiment ID")
+        collection_1 = st.text_input("First Collection Name (if not found locally)")
+    with col2:
+        experiment_id_2 = st.text_input("Second Experiment ID")
+        collection_2 = st.text_input("Second Collection Name (if not found locally)")
+    
+    # Add Start Comparison button
+    if st.button("Start Comparison", key="start_comparison"):
+        if not experiment_id_1 or not experiment_id_2:
+            st.error("Please enter both experiment IDs to begin comparison.")
+        else:
+            try:
+                # Load both experiments
+                experiment_dir_1 = f".results-{experiment_id_1}"
+                experiment_dir_2 = f".results-{experiment_id_2}"
+                
+                # Check if experiments exist locally, if not try to retrieve from Couchbase
+                if not os.path.exists(experiment_dir_1):
+                    if collection_1:
+                        with st.spinner(f"Retrieving experiment {experiment_id_1} from Couchbase..."):
+                            experiment = Experiment()
+                            experiment.retrieve(experiment_id=experiment_id_1, collection=collection_1)
+                    else:
+                        st.error(f"Experiment {experiment_id_1} not found locally. Please provide a collection name to retrieve from Couchbase.")
+                        st.stop()
+                
+                if not os.path.exists(experiment_dir_2):
+                    if collection_2:
+                        with st.spinner(f"Retrieving experiment {experiment_id_2} from Couchbase..."):
+                            experiment = Experiment()
+                            experiment.retrieve(experiment_id=experiment_id_2, collection=collection_2)
+                    else:
+                        st.error(f"Experiment {experiment_id_2} not found locally. Please provide a collection name to retrieve from Couchbase.")
+                        st.stop()
+                
+                # Now check if both experiments exist after potential retrieval
+                if os.path.exists(experiment_dir_1) and os.path.exists(experiment_dir_2):
+                    # Load experiment configs
+                    with open(f"{experiment_dir_1}/experiment_config.json", "r") as f:
+                        config_1 = json.load(f)
+                    with open(f"{experiment_dir_2}/experiment_config.json", "r") as f:
+                        config_2 = json.load(f)
+                    
+                    # Load results
+                    with open(f"{experiment_dir_1}/results.json", "r") as f:
+                        results_1 = json.load(f)
+                    with open(f"{experiment_dir_2}/results.json", "r") as f:
+                        results_2 = json.load(f)
+                    
+                    # Convert to DataFrames
+                    df1 = pd.DataFrame(results_1)
+                    df2 = pd.DataFrame(results_2)
+                    
+                    # Display experiment configurations side by side
+                    st.subheader("Experiment Configurations")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.write(f"**Experiment {experiment_id_1}**")
+                        st.json(config_1)
+                    
+                    with col2:
+                        st.write(f"**Experiment {experiment_id_2}**")
+                        st.json(config_2)
+                    
+                    # Compare metrics
+                    st.subheader("Metrics Comparison")
+                    
+                    # Select numeric columns for comparison
+                    numeric_columns = df1.select_dtypes(include=['float64', 'int64']).columns
+                    
+                    # Create comparison DataFrame
+                    comparison_df = pd.DataFrame({
+                        'Metric': numeric_columns,
+                        f'Experiment {experiment_id_1}': df1[numeric_columns].mean(),
+                        f'Experiment {experiment_id_2}': df2[numeric_columns].mean(),
+                        'Difference': df1[numeric_columns].mean() - df2[numeric_columns].mean()
+                    })
+                    
+                    # Display comparison table
+                    st.dataframe(comparison_df)
+                    
+                    # Create tabs for different visualization types
+                    viz_tabs = st.tabs(["Summary Dashboard", "Detailed Distributions", "Statistical Analysis"])
+                    
+                    with viz_tabs[0]:
+                        st.subheader("Key Metrics Overview")
+                        
+                        # Create a multi-select for metrics to visualize
+                        selected_metrics = st.multiselect(
+                            "Select metrics to visualize",
+                            options=list(numeric_columns),
+                            default=list(numeric_columns)[:min(5, len(numeric_columns))]  # Default to first 5 metrics or less
+                        )
+                        
+                        if selected_metrics:
+                            # 1. Create a bar chart for direct comparison with percent difference
+                            bar_comparison = pd.DataFrame({
+                                'Metric': selected_metrics,
+                                f'Exp {experiment_id_1}': [df1[metric].mean() for metric in selected_metrics],
+                                f'Exp {experiment_id_2}': [df2[metric].mean() for metric in selected_metrics],
+                                'Percent Diff': [((df2[metric].mean() / df1[metric].mean()) - 1) * 100 if df1[metric].mean() != 0 else 0 
+                                               for metric in selected_metrics]
+                            })
+                            
+                            # Bar chart for direct comparison
+                            fig_bar = px.bar(
+                                bar_comparison,
+                                x='Metric',
+                                y=[f'Exp {experiment_id_1}', f'Exp {experiment_id_2}'],
+                                barmode='group',
+                                title="Metric Comparison",
+                                labels={'value': 'Score', 'variable': 'Experiment'},
+                                color_discrete_sequence=['#636EFA', '#EF553B']
+                            )
+                            st.plotly_chart(fig_bar, use_container_width=True)
+                            
+                            # 2. Create a radar chart for multi-metric comparison
+                            # Normalize metrics for radar chart to 0-1 scale
+                            radar_data = {}
+                            for metric in selected_metrics:
+                                min_val = min(df1[metric].min(), df2[metric].min())
+                                max_val = max(df1[metric].max(), df2[metric].max())
+                                range_val = max_val - min_val
+                                
+                                if range_val == 0:  # Handle case where min = max
+                                    radar_data[metric] = [0.5, 0.5]
+                                else:
+                                    radar_data[metric] = [
+                                        (df1[metric].mean() - min_val) / range_val,
+                                        (df2[metric].mean() - min_val) / range_val
+                                    ]
+                            
+                            # Create radar chart data
+                            radar_fig = go.Figure()
+                            
+                            radar_fig.add_trace(go.Scatterpolar(
+                                r=[radar_data[metric][0] for metric in selected_metrics],
+                                theta=selected_metrics,
+                                fill='toself',
+                                name=f'Experiment {experiment_id_1}'
+                            ))
+                            radar_fig.add_trace(go.Scatterpolar(
+                                r=[radar_data[metric][1] for metric in selected_metrics],
+                                theta=selected_metrics,
+                                fill='toself',
+                                name=f'Experiment {experiment_id_2}'
+                            ))
+                            
+                            radar_fig.update_layout(
+                                polar=dict(
+                                    radialaxis=dict(
+                                        visible=True,
+                                        range=[0, 1]
+                                    )),
+                                showlegend=True,
+                                title="Metrics Radar Chart (Normalized)"
+                            )
+                            
+                            st.plotly_chart(radar_fig, use_container_width=True)
+                            
+                            # 3. Improvement/Degradation Analysis
+                            st.subheader("Improvement Analysis")
+                            
+                            # Calculate significant improvements
+                            from scipy import stats
+                            
+                            analysis_data = []
+                            for metric in selected_metrics:
+                                t_stat, p_value = stats.ttest_ind(df1[metric], df2[metric])
+                                mean1 = df1[metric].mean()
+                                mean2 = df2[metric].mean()
+                                diff = mean2 - mean1
+                                pct_diff = (mean2 / mean1 - 1) * 100 if mean1 != 0 else 0
+                                
+                                significant = p_value < 0.05
+                                better = (diff > 0)
+                                
+                                analysis_data.append({
+                                    'Metric': metric,
+                                    'Difference': diff,
+                                    'Percent Change': f"{pct_diff:.2f}%",
+                                    'Significant': "Yes" if significant else "No",
+                                    'Better': "Improved" if better else "Decreased",
+                                    'p-value': p_value
+                                })
+                            
+                            analysis_df = pd.DataFrame(analysis_data)
+                            
+                            # Color code the dataframe
+                            def color_significant(val):
+                                if val == "Yes":
+                                    return 'background-color: rgba(76, 175, 80, 0.3)'
+                                return ''
+                            
+                            def color_better(val):
+                                if val == "Improved":
+                                    return 'background-color: rgba(76, 175, 80, 0.3)'
+                                else:
+                                    return 'background-color: rgba(244, 67, 54, 0.3)'
+                            
+                            styled_df = analysis_df.style\
+                                .applymap(color_significant, subset=['Significant'])\
+                                .applymap(color_better, subset=['Better'])
+                            
+                            st.dataframe(styled_df)
+                        else:
+                            st.warning("Please select at least one metric to visualize")
+                    
+                    with viz_tabs[1]:
+                        st.subheader("Metric Distributions")
+                        
+                        # Create a selector for which metric to display
+                        selected_metric = st.selectbox(
+                            "Select metric to view distribution",
+                            options=numeric_columns
+                        )
+                        
+                        if selected_metric:
+                            # Create a subplot with 2 rows and 1 column
+                            fig = make_subplots(
+                                rows=2, 
+                                cols=1,
+                                subplot_titles=[
+                                    f"Histogram: {selected_metric}",
+                                    f"Box Plot: {selected_metric}"
+                                ],
+                                vertical_spacing=0.2
+                            )
+                            
+                            # Add histograms to the first row
+                            fig.add_trace(
+                                go.Histogram(
+                                    x=df1[selected_metric],
+                                    name=f'Exp {experiment_id_1}',
+                                    opacity=0.75,
+                                    marker_color='#636EFA'
+                                ),
+                                row=1, col=1
+                            )
+                            
+                            fig.add_trace(
+                                go.Histogram(
+                                    x=df2[selected_metric],
+                                    name=f'Exp {experiment_id_2}',
+                                    opacity=0.75,
+                                    marker_color='#EF553B'
+                                ),
+                                row=1, col=1
+                            )
+                            
+                            # Add box plots to the second row
+                            fig.add_trace(
+                                go.Box(
+                                    y=df1[selected_metric],
+                                    name=f'Exp {experiment_id_1}',
+                                    marker_color='#636EFA'
+                                ),
+                                row=2, col=1
+                            )
+                            
+                            fig.add_trace(
+                                go.Box(
+                                    y=df2[selected_metric],
+                                    name=f'Exp {experiment_id_2}',
+                                    marker_color='#EF553B'
+                                ),
+                                row=2, col=1
+                            )
+                            
+                            # Update layout
+                            fig.update_layout(
+                                height=600,
+                                barmode='overlay',
+                                title_text=f"Distribution Comparison for {selected_metric}",
+                                legend=dict(
+                                    orientation="h",
+                                    yanchor="bottom",
+                                    y=1.02,
+                                    xanchor="right",
+                                    x=1
+                                )
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Add statistical comparison
+                            st.subheader(f"Statistical Summary for {selected_metric}")
+                            
+                            stats_df = pd.DataFrame({
+                                'Statistic': ['Mean', 'Median', 'Std Dev', 'Min', 'Max', '25th Percentile', '75th Percentile'],
+                                f'Exp {experiment_id_1}': [
+                                    df1[selected_metric].mean(),
+                                    df1[selected_metric].median(),
+                                    df1[selected_metric].std(),
+                                    df1[selected_metric].min(),
+                                    df1[selected_metric].max(),
+                                    df1[selected_metric].quantile(0.25),
+                                    df1[selected_metric].quantile(0.75)
+                                ],
+                                f'Exp {experiment_id_2}': [
+                                    df2[selected_metric].mean(),
+                                    df2[selected_metric].median(),
+                                    df2[selected_metric].std(),
+                                    df2[selected_metric].min(),
+                                    df2[selected_metric].max(),
+                                    df2[selected_metric].quantile(0.25),
+                                    df2[selected_metric].quantile(0.75)
+                                ],
+                                'Difference': [
+                                    df2[selected_metric].mean() - df1[selected_metric].mean(),
+                                    df2[selected_metric].median() - df1[selected_metric].median(),
+                                    df2[selected_metric].std() - df1[selected_metric].std(),
+                                    df2[selected_metric].min() - df1[selected_metric].min(),
+                                    df2[selected_metric].max() - df1[selected_metric].max(),
+                                    df2[selected_metric].quantile(0.25) - df1[selected_metric].quantile(0.25),
+                                    df2[selected_metric].quantile(0.75) - df1[selected_metric].quantile(0.75)
+                                ]
+                            })
+                            
+                            st.dataframe(stats_df)
+                        else:
+                            st.warning("No metric selected")
+                    
+                    with viz_tabs[2]:
+                        st.subheader("Statistical Tests")
+                        
+                        # Create tests for each metric
+                        test_results = []
+                        
+                        for metric in numeric_columns:
+                            # Perform statistical tests
+                            from scipy import stats
+                            
+                            # T-test
+                            t_stat, p_value = stats.ttest_ind(df1[metric], df2[metric])
+                            
+                            # Mann-Whitney U test (non-parametric)
+                            u_stat, u_p_value = stats.mannwhitneyu(df1[metric], df2[metric], alternative='two-sided')
+                            
+                            # Effect size - Cohen's d
+                            mean1, mean2 = df1[metric].mean(), df2[metric].mean()
+                            std1, std2 = df1[metric].std(), df2[metric].std()
+                            pooled_std = np.sqrt((std1**2 + std2**2) / 2)
+                            effect_size = abs(mean1 - mean2) / pooled_std if pooled_std != 0 else 0
+                            
+                            # Interpretation
+                            if effect_size < 0.2:
+                                effect_interpretation = "Negligible"
+                            elif effect_size < 0.5:
+                                effect_interpretation = "Small"
+                            elif effect_size < 0.8:
+                                effect_interpretation = "Medium"
+                            else:
+                                effect_interpretation = "Large"
+                                
+                            # Add to results
+                            test_results.append({
+                                'Metric': metric,
+                                'T-statistic': t_stat,
+                                'T-test p-value': p_value,
+                                'U-statistic': u_stat,
+                                'Mann-Whitney p-value': u_p_value,
+                                "Cohen's d": effect_size,
+                                'Effect Size': effect_interpretation,
+                                'Significant Difference': 'Yes' if p_value < 0.05 or u_p_value < 0.05 else 'No'
+                            })
+                        
+                        # Convert to DataFrame
+                        test_df = pd.DataFrame(test_results)
+                        
+                        # Style DataFrame to highlight significant differences
+                        def highlight_significant(val):
+                            if val == 'Yes':
+                                return 'background-color: rgba(76, 175, 80, 0.3)'
+                            return ''
+                        
+                        def highlight_pvalue(val):
+                            if val < 0.05:
+                                return 'background-color: rgba(76, 175, 80, 0.3)'
+                            return ''
+                        
+                        styled_test_df = test_df.style\
+                            .applymap(highlight_significant, subset=['Significant Difference'])\
+                            .applymap(highlight_pvalue, subset=['T-test p-value', 'Mann-Whitney p-value'])\
+                            .format({
+                                'T-statistic': '{:.4f}',
+                                'T-test p-value': '{:.4f}',
+                                'U-statistic': '{:.4f}',
+                                'Mann-Whitney p-value': '{:.4f}',
+                                "Cohen's d": '{:.4f}'
+                            })
+                        
+                        st.dataframe(styled_test_df)
+                        
+                        # Add explanation of statistical tests
+                        with st.expander("Statistical Tests Explanation"):
+                            st.markdown("""
+                            ### T-test
+                            Tests if the means of two independent samples are significantly different. A p-value < 0.05 indicates a significant difference.
+                            
+                            ### Mann-Whitney U Test
+                            Non-parametric test that doesn't assume normal distribution. Compares the medians of two independent samples.
+                            
+                            ### Cohen's d
+                            Measures effect size - the standardized difference between two means:
+                            - < 0.2: Negligible effect
+                            - 0.2 - 0.5: Small effect
+                            - 0.5 - 0.8: Medium effect
+                            - > 0.8: Large effect
+                            """)
+                
+                else:
+                    st.error("One or both experiments could not be retrieved. Please check the experiment IDs and collection names.")
+                    
+            except Exception as e:
+                st.error(f"Error comparing experiments: {str(e)}")
+    else:
+        st.info("Enter experiment IDs and collection names (if needed), then click 'Start Comparison' to begin.")
+
+# Footer
+st.markdown("---")
+st.markdown("RAG Evaluation Framework - A comprehensive tool for evaluating Retrieval-Augmented Generation systems")
