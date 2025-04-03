@@ -34,7 +34,7 @@ def get_langgraph_logs():
     Get the langgraph logs from the default save path
     """
     save_dir = get_default_save_directory()
-    file_path = save_dir / "langgraph_results.json"
+    file_path = save_dir / "langgraph_stream_results.json"
     with open(file_path, "r") as f:
         return json.load(f)
 
