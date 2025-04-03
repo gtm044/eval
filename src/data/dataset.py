@@ -1,6 +1,6 @@
 # src/data/dataset.py
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 import json
 import uuid
 
