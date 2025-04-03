@@ -19,13 +19,20 @@ from src.evaluator.metrics import (
     named_entity_score
 )
 from src.evaluator.validation import ValidationEngine
+from src.data.load import LoadOperator
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 
+STREAMLIT_ENV_FILE = ".env.streamlit"
+
 # Load environment variables
 load_dotenv()
+
+# Initialize session state for button click
+if "saved" not in st.session_state:
+    st.session_state.saved = False
 
 # Set page config
 st.set_page_config(
@@ -38,14 +45,49 @@ st.set_page_config(
 with st.sidebar:
     st.title("RAG Evaluation Framework")
     st.markdown("A comprehensive framework for evaluating RAG systems")
-    
+        
     option = st.radio(
         "Choose functionality:",
-        ["Data Generation", "Evaluation", "Experiment", "Result Analysis", "Compare Experiments"]
+        ["Generate Data", "Evaluate", "Experiment", "Result Analysis", "Compare Experiments", "Docs"]
     )
 
+    # Expander for Couchbase Credentials
+    with st.expander("Provide Couchbase Credentials (optional)", expanded=False):
+        couchbase_url = st.text_input("Cluster URL", type="default")
+        couchbase_username = st.text_input("Username", type="default")
+        couchbase_password = st.text_input("Password", type="password")
+        couchbase_bucket = st.text_input("Bucket", type="default")
+        couchbase_scope = st.text_input("Scope", type="default")
+        couchbase_collection = st.text_input("Collection", type="default")
+
+        # Save button with session state tracking
+        if st.button("Save"):
+            # Save to .env.streamlit file
+            with open(STREAMLIT_ENV_FILE, "w") as f:
+                f.write(f"cluster_url={couchbase_url}\n")
+                f.write(f"cb_username={couchbase_username}\n")
+                f.write(f"cb_password={couchbase_password}\n")
+                f.write(f"bucket={couchbase_bucket}\n")
+                f.write(f"scope={couchbase_scope}\n")
+                f.write(f"collection={couchbase_collection}\n")    
+                os.environ["cluster_url"] = couchbase_url
+                os.environ["cb_username"] = couchbase_username
+                os.environ["cb_password"] = couchbase_password
+                os.environ["bucket"] = couchbase_bucket
+                os.environ["scope"] = couchbase_scope
+                os.environ["collection"] = couchbase_collection
+
+            # Set session state to True to prevent multiple clicks
+            st.session_state.saved = True
+            st.rerun()
+            
+    if st.session_state.saved:
+        st.success("Couchbase credentials saved")
+
 # Main content
-if option == "Data Generation":
+
+            
+if option == "Generate Data":
     st.title("Synthetic Data Generation")
     
     # Initialize session state variables for Data Generation tab
@@ -185,16 +227,16 @@ if option == "Data Generation":
                 st.session_state.data_generation_completed = True
                 st.session_state.generated_data = generated_data
                 
-                # Create EvalDataset and store it
-                dataset = EvalDataset(
-                    questions=generated_data["questions"],
-                    answers=generated_data["answers"],
-                    reference_contexts=generated_data["reference_contexts"]
-                )
+                dataset = {
+                    "questions": st.session_state.generated_data["questions"],
+                    "answers": st.session_state.generated_data["answers"],
+                    "reference_contexts": st.session_state.generated_data["reference_contexts"]
+                }
                 st.session_state.generated_dataset = dataset
-                
+                                    
                 # Save to JSON for download
-                dataset.to_json("generated_dataset.json")
+                with open("generated_dataset.json", "w") as f:
+                    json.dump(st.session_state.generated_dataset, f)
                 
             except Exception as e:
                 st.error(f"Error generating data: {str(e)}")
@@ -240,10 +282,10 @@ if option == "Data Generation":
             if os.path.exists("generated_dataset.json"):
                 os.remove("generated_dataset.json")
 
-elif option == "Evaluation":
+elif option == "Evaluate":
     st.title("RAG System Evaluation")
     
-    # Initialize session state variables for Evaluation tab
+    # Initialize session state
     if 'evaluation_dataset_loaded' not in st.session_state:
         st.session_state.evaluation_dataset_loaded = False
     if 'evaluation_dataset' not in st.session_state:
@@ -257,7 +299,7 @@ elif option == "Evaluation":
     if 'evaluation_metrics_objs' not in st.session_state:
         st.session_state.evaluation_metrics_objs = None
     
-    # Clear evaluation state if needed
+    # Clear evaluation state 
     if st.button("Clear Evaluation", key="clear_evaluation"):
         st.session_state.evaluation_dataset_loaded = False
         st.session_state.evaluation_dataset = None
@@ -267,29 +309,62 @@ elif option == "Evaluation":
         st.session_state.evaluation_metrics_objs = None
     
     if not st.session_state.evaluation_dataset_loaded:
-        uploaded_file = st.file_uploader("Upload evaluation dataset (JSON)", type=["json"], key="evaluation_dataset_uploader")
+        # Create tabs for dataset source selection
+        dataset_source_tab1, dataset_source_tab2 = st.tabs(["Upload Dataset", "Load from Couchbase"])
         
-        if uploaded_file is not None:
-            try:
-                # Save the uploaded file
-                with open("temp_dataset.json", "wb") as f:
-                    f.write(uploaded_file.getbuffer())
+        with dataset_source_tab1:
+            uploaded_file = st.file_uploader("Upload evaluation dataset (JSON)", type=["json"], key="evaluation_dataset_uploader")
+            
+            if uploaded_file is not None:
+                try:
+                    # Save the uploaded file
+                    with open("temp_dataset.json", "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Load dataset
+                    dataset = EvalDataset.from_json("temp_dataset.json")
+                    
+                    # Store in session state
+                    st.session_state.evaluation_dataset_loaded = True
+                    st.session_state.evaluation_dataset = dataset
+                    
+                    # Clean up
+                    os.remove("temp_dataset.json")
+                except Exception as e:
+                    st.error(f"Error loading dataset: {str(e)}")
+        
+        with dataset_source_tab2:
+            st.write("Load dataset from Couchbase")
+            
+            # Check if Couchbase credentials are available
+            if (os.environ.get("cluster_url") and 
+                os.environ.get("cb_username") and 
+                os.environ.get("cb_password") and 
+                os.environ.get("bucket") and 
+                os.environ.get("scope") and 
+                os.environ.get("collection")):
                 
-                # Load dataset
-                dataset = EvalDataset.from_json("temp_dataset.json")
+                # Provide dataset ID input
+                dataset_id = st.text_input("Dataset ID", placeholder="Enter the dataset ID to load")
                 
-                # Store in session state
-                st.session_state.evaluation_dataset_loaded = True
-                st.session_state.evaluation_dataset = dataset
-                
-                # Clean up
-                os.remove("temp_dataset.json")
-            except Exception as e:
-                st.error(f"Error loading dataset: {str(e)}")
+                if st.button("Load Dataset", key="load_dataset_from_cb"):
+                    try:
+                        with st.spinner("Loading dataset from Couchbase..."):
+                            # Initialize dataset with load operator
+                            dataset = LoadOperator().retrieve_docs(dataset_id=dataset_id)
+                            
+                            # Store in session state
+                            st.session_state.evaluation_dataset_loaded = True
+                            st.session_state.evaluation_dataset = dataset
+                            
+                    except Exception as e:
+                        st.error(f"Error loading dataset from Couchbase: {str(e)}")
+            else:
+                st.warning("Couchbase credentials not configured. Please provide them in the sidebar.")
     
-    # Display dataset info and evaluation options if dataset is loaded
+    # Display dataset info and evaluation options
     if st.session_state.evaluation_dataset_loaded:
-        # Show dataset preview
+        # Show preview
         st.subheader("Dataset Preview")
         
         dataset = st.session_state.evaluation_dataset
@@ -409,8 +484,47 @@ elif option == "Experiment":
     with tab1:
         st.header("Create New Experiment")
         
-        # Dataset upload
-        uploaded_file = st.file_uploader("Upload evaluation dataset (JSON)", type=["json"], key="experiment_dataset_uploader")
+        # Dataset source selection
+        dataset_source = st.radio("Select dataset source:", ["Upload JSON", "Load from Couchbase"])
+        
+        if dataset_source == "Upload JSON":
+            # Dataset upload
+            uploaded_file = st.file_uploader("Upload evaluation dataset (JSON)", type=["json"], key="experiment_dataset_uploader")
+            dataset_loaded = uploaded_file is not None
+        else:  # Load from Couchbase
+            # Check if environment variables are set
+            env_vars_set = all([os.getenv("bucket"), os.getenv("scope"), 
+                              os.getenv("cluster_url"), os.getenv("cb_username"), 
+                              os.getenv("cb_password")])
+            
+            if not env_vars_set:
+                st.warning("Couchbase environment variables not set. Please configure them in the sidebar.")
+                dataset_loaded = False
+            else:
+                # Allow user to specify collection and dataset ID
+                dataset_id = st.text_input("Dataset ID")
+                
+                if st.button("Load Dataset from Couchbase"):
+                    try:
+                        with st.spinner("Loading dataset from Couchbase..."):
+                            # Initialize LoadOperator
+                            load_op = LoadOperator()
+                            
+                            # Load dataset from Couchbase
+                            dataset = load_op.retrieve_docs(dataset_id=dataset_id)
+                            
+                            if dataset:
+                                st.session_state.experiment_dataset = dataset
+                                st.success(f"Successfully loaded dataset with ID: {dataset_id}")
+                                dataset_loaded = True
+                            else:
+                                st.error(f"No data found for dataset ID: {dataset_id}")
+                                dataset_loaded = False
+                    except Exception as e:
+                        st.error(f"Error loading dataset from Couchbase: {str(e)}")
+                        dataset_loaded = False
+                else:
+                    dataset_loaded = False
         
         # Experiment configuration
         st.subheader("Experiment Configuration")
@@ -446,15 +560,21 @@ elif option == "Experiment":
             use_context_similarity = st.checkbox("Context Similarity", value=True, key="exp_ctx_sim")
             use_context_score = st.checkbox("Context Score", value=True, key="exp_ctx_score")
         
-        if uploaded_file is not None and st.button("Create Experiment", key="create_experiment"):
+        create_experiment_button = st.button("Create Experiment", key="create_experiment", disabled=not dataset_loaded)
+        
+        if create_experiment_button:
             try:
-                # Save the uploaded file
-                with open("temp_dataset.json", "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                
-                # Load dataset
-                dataset = EvalDataset.from_json("temp_dataset.json")
-                st.session_state.experiment_dataset = dataset
+                # If using uploaded file, save it and load dataset
+                if dataset_source == "Upload JSON":
+                    with open("temp_dataset.json", "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    
+                    # Load dataset
+                    dataset = EvalDataset.from_json("temp_dataset.json")
+                    st.session_state.experiment_dataset = dataset
+                else:
+                    # Dataset already loaded from Couchbase
+                    dataset = st.session_state.experiment_dataset
                 
                 # Prepare metrics list
                 metrics = []
@@ -494,8 +614,9 @@ elif option == "Experiment":
                         results = json.load(f)
                     st.session_state.experiment_results_df = pd.DataFrame(results)
                 
-                # Clean up
-                os.remove("temp_dataset.json")
+                # Clean up if using uploaded file
+                if dataset_source == "Upload JSON" and os.path.exists("temp_dataset.json"):
+                    os.remove("temp_dataset.json")
             except Exception as e:
                 st.error(f"Error creating experiment: {str(e)}")
         
@@ -757,7 +878,7 @@ elif option == "Result Analysis":
         # Add a button to load different experiment
         if st.button("Load Different Experiment", key="change_experiment"):
             clear_result_analysis_state()
-            st.experimental_rerun()
+            st.rerun()
         
         # Access stored data
         config = st.session_state.result_analysis_config
@@ -824,8 +945,14 @@ elif option == "Result Analysis":
                     fig = go.Figure()
                     
                     for metric in selected_metrics:
+                        # Filter out invalid values for precision/recall metrics
+                        metric_data = df[metric]
+                        if metric.endswith('precision') or metric.endswith('recall') or metric == 'faithfulness' or metric == 'answer_relevancy':
+                            # Filter values to be between 0 and 1 for metrics that should be bounded
+                            metric_data = metric_data.clip(0, 1)
+                        
                         fig.add_trace(go.Violin(
-                            y=df[metric],
+                            y=metric_data,
                             name=metric,
                             box_visible=True,
                             meanline_visible=True
@@ -838,6 +965,10 @@ elif option == "Result Analysis":
                         height=500
                     )
                     
+                    # Add appropriate y-axis bounds for precision/recall metrics
+                    if all(m.endswith('precision') or m.endswith('recall') or m == 'faithfulness' or m == 'answer_relevancy' for m in selected_metrics):
+                        fig.update_layout(yaxis=dict(range=[0, 1]))
+                    
                     st.plotly_chart(fig, use_container_width=True)
                     
                     
@@ -846,14 +977,14 @@ elif option == "Result Analysis":
                     
                     # Define quality thresholds for each metric based on domain knowledge
                     metric_thresholds = {
-                        "context_precision": 0.7,
-                        "context_recall": 0.7,
+                        "context_precision": 0.9,
+                        "context_recall": 0.9,
                         "answer_relevancy": 0.7,
                         "faithfulness": 0.8,
                         "answer_correctness": 0.7,
                         "avg_chunk_size": 0.5,
-                        "context_similarity": 0.7,
-                        "context_score": 0.7,
+                        "context_similarity": 0.8,
+                        "context_score": 0.8,
                         "named_entity_score": 0.6,
                         # Add custom thresholds for other metrics if needed
                     }
@@ -961,17 +1092,30 @@ elif option == "Result Analysis":
                     
                     with col1:
                         # Histogram
+                        # Check if selected metric should be bounded
+                        bounded_metrics = ['context_precision', 'context_recall', 'faithfulness', 'answer_relevancy', 'answer_correctness', 'context_similarity', 'context_score']
+                        is_bounded = selected_metric in bounded_metrics or any(selected_metric.endswith(suffix) for suffix in ['precision', 'recall'])
+
+                        # Filter data if needed
+                        df_filtered = df[selected_metric]
+                        if is_bounded:
+                            df_filtered = df[selected_metric].clip(0, 1)
+
                         hist_fig = px.histogram(
-                            df,
-                            x=selected_metric,
+                            x=df_filtered,
                             title=f"Distribution of {selected_metric}",
                             marginal="box"  # Add box plot at the margin
                         )
+
+                        # Set x-axis range for bounded metrics
+                        if is_bounded:
+                            hist_fig.update_layout(xaxis=dict(range=[0, 1]))
+
                         st.plotly_chart(hist_fig, use_container_width=True)
                     
                     with col2:
                         # CDF (Cumulative Distribution Function)
-                        sorted_data = np.sort(df[selected_metric])
+                        sorted_data = np.sort(df_filtered)
                         cumulative = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
                         
                         cdf_fig = go.Figure()
@@ -996,15 +1140,15 @@ elif option == "Result Analysis":
                     
                     stats_cols = st.columns(5)
                     with stats_cols[0]:
-                        st.metric("Mean", f"{df[selected_metric].mean():.3f}")
+                        st.metric("Mean", f"{df_filtered.mean():.3f}")
                     with stats_cols[1]:
-                        st.metric("Median", f"{df[selected_metric].median():.3f}")
+                        st.metric("Median", f"{df_filtered.median():.3f}")
                     with stats_cols[2]:
-                        st.metric("Std Dev", f"{df[selected_metric].std():.3f}")
+                        st.metric("Std Dev", f"{df_filtered.std():.3f}")
                     with stats_cols[3]:
-                        st.metric("Min", f"{df[selected_metric].min():.3f}")
+                        st.metric("Min", f"{df_filtered.min():.3f}")
                     with stats_cols[4]:
-                        st.metric("Max", f"{df[selected_metric].max():.3f}")
+                        st.metric("Max", f"{df_filtered.max():.3f}")
                     
                 else:
                     st.warning("Please select a metric to analyze")
@@ -1341,58 +1485,84 @@ elif option == "Compare Experiments":
                 )
                 
                 # Add histograms to the first row
+                bounded_metrics = ['context_precision', 'context_recall', 'faithfulness', 'answer_relevancy', 'answer_correctness', 'context_similarity', 'context_score']
+                is_bounded = selected_metric in bounded_metrics or any(selected_metric.endswith(suffix) for suffix in ['precision', 'recall'])
+
+                # Filter data if needed
+                df1_filtered = df1[selected_metric]
+                df2_filtered = df2[selected_metric]
+                if is_bounded:
+                    df1_filtered = df1[selected_metric].clip(0, 1)
+                    df2_filtered = df2[selected_metric].clip(0, 1)
+
                 fig.add_trace(
                     go.Histogram(
-                        x=df1[selected_metric],
+                        x=df1_filtered,
                         name=f'Exp {experiment_id_1}',
                         opacity=0.75,
                         marker_color='#636EFA'
                     ),
                     row=1, col=1
                 )
-                
+
                 fig.add_trace(
                     go.Histogram(
-                        x=df2[selected_metric],
+                        x=df2_filtered,
                         name=f'Exp {experiment_id_2}',
                         opacity=0.75,
                         marker_color='#EF553B'
                     ),
                     row=1, col=1
                 )
-                
+
                 # Add box plots to the second row
                 fig.add_trace(
                     go.Box(
-                        y=df1[selected_metric],
+                        y=df1_filtered,
                         name=f'Exp {experiment_id_1}',
                         marker_color='#636EFA'
                     ),
                     row=2, col=1
                 )
-                
+
                 fig.add_trace(
                     go.Box(
-                        y=df2[selected_metric],
+                        y=df2_filtered,
                         name=f'Exp {experiment_id_2}',
                         marker_color='#EF553B'
                     ),
                     row=2, col=1
                 )
-                
-                # Update layout
-                fig.update_layout(
-                    height=600,
-                    barmode='overlay',
-                    title_text=f"Distribution Comparison for {selected_metric}",
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1
+
+                # Update layout with appropriate axis ranges if needed
+                if is_bounded:
+                    fig.update_layout(
+                        height=600,
+                        barmode='overlay',
+                        title_text=f"Distribution Comparison for {selected_metric}",
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1
+                        ),
+                        xaxis=dict(range=[0, 1]),
+                        yaxis2=dict(range=[0, 1])
                     )
-                )
+                else:
+                    fig.update_layout(
+                        height=600,
+                        barmode='overlay',
+                        title_text=f"Distribution Comparison for {selected_metric}",
+                        legend=dict(
+                            orientation="h",
+                            yanchor="bottom",
+                            y=1.02,
+                            xanchor="right",
+                            x=1
+                        )
+                    )
                 
                 st.plotly_chart(fig, use_container_width=True)
                 
@@ -1521,6 +1691,150 @@ elif option == "Compare Experiments":
                 - 0.5 - 0.8: Medium effect
                 - > 0.8: Large effect
                 """)
+                
+elif option == "Docs":
+    st.title("RAG Evaluation Framework")
+    st.markdown("A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) systems using RAGAS and synthesizing ground truth data from raw documents.")
+
+    # Overview section
+    st.header("Overview")
+    st.markdown("""
+    This framework provides tools and metrics to evaluate RAG systems across three key components:
+    - Chunking evaluation
+    - Retrieval evaluation
+    - Generation evaluation
+
+    The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management, storage and result persistence.
+    """)
+    
+    # Installation section
+    st.header("Installation")
+    st.code("""
+    # Clone the repository
+    # Install the package:
+    cd eval
+    pip install .
+    """)
+    
+    # Configuration section
+    st.header("Configuration")
+    st.markdown("""
+    The framework uses environment variables for Couchbase and OpenAI configurations. 
+    Configure these in the sidebar or in your .env file.
+    """)
+    
+    # Quick Start Guide
+    st.header("Quick Start Guide")
+    
+    quick_start_tabs = st.tabs(["Synthetic Data Generation", "Basic Evaluation", "Experiment-based Evaluation"])
+    
+    with quick_start_tabs[0]:
+        st.markdown("""
+        ### Synthetic Data Generation
+        
+        The framework provides tools to generate synthetic question-answer pairs from your documents, 
+        which can be used as ground truth for evaluation.
+        
+        For JSON and CSV documents, provide detailed metadata including the dataset schema for accurate data generation.
+        """)
+        
+        st.code("""
+        # From Python
+        from eval.src.data.generator import SyntheticDataGenerator
+
+        # Initialize the generator
+        generator = SyntheticDataGenerator()
+
+        # Generate synthetic data from a CSV file
+        metadata = "Document contains product descriptions with fields: name, description, price, and category."
+        generated_data = generator.synthesize_from_csv(
+            path="data/products.csv",
+            metadata=metadata
+        )
+        """)
+        
+        st.markdown("**Or use the 'Generate Data' option in the sidebar to use the UI.**")
+    
+    with quick_start_tabs[1]:
+        st.markdown("### Basic Evaluation")
+        st.code("""
+        from eval.src.data.dataset import EvalDataset
+        from eval.src.evaluator.validation import ValidationEngine
+        from eval.src.evaluator.metrics import context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness
+
+        # Create dataset
+        dataset = EvalDataset(
+            questions=["What is RAG?"],
+            answers=[["RAG is a retrieval-augmented generation system"]],
+            responses=["RAG combines retrieval with generation"],
+            reference_contexts=["RAG systems use retrieval to enhance generation"],
+            retrieved_contexts=[["RAG: retrieval-augmented generation"]]
+        )
+
+        # Run evaluation with metrics
+        engine = ValidationEngine(
+            dataset=dataset,
+            metrics=[context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness]
+        )
+        results = engine.evaluate()
+        """)
+        
+        st.markdown("**Or use the 'Evaluate' option in the sidebar for a UI-based approach.**")
+    
+    with quick_start_tabs[2]:
+        st.markdown("### Experiment-based Evaluation")
+        st.code("""
+        from eval.src.controller.options import ExperimentOptions
+        from eval.src.controller.manager import Experiment
+
+        # Configure experiment
+        experiment_options = ExperimentOptions(
+            experiment_id="exp_001",
+            dataset_id="dataset_001",
+            metrics=[context_precision, context_recall, faithfulness],
+            chunk_size=100,
+            chunk_overlap=20,
+            embedding_model="text-embedding-3-large",
+            embedding_dimension=3072,
+            llm_model="gpt-4"
+        )
+
+        # Create experiment
+        experiment = Experiment(dataset=dataset, options=experiment_options)
+
+        # Load to Couchbase
+        experiment.load_to_couchbase()
+        """)
+        
+        st.markdown("**Or use the 'Experiment' option in the sidebar for the UI version.**")
+    
+    # Roadmap section
+    st.header("Roadmap")
+    roadmap_cols = st.columns(3)
+    
+    with roadmap_cols[0]:
+        st.subheader("Basic Features")
+        st.markdown("""
+        - Custom metric integration
+        - Multi-turn conversation evaluation
+        - Composite, multi-hop Q&A generator
+        - Multiple ground truth answers
+        """)
+    
+    with roadmap_cols[1]:
+        st.subheader("Multimodal RAG Support")
+        st.markdown("""
+        - Image retrieval evaluation
+        - Table content processing
+        - Cross-modal metrics
+        """)
+    
+    with roadmap_cols[2]:
+        st.subheader("Agentic Evaluation")
+        st.markdown("""
+        - Tool call evaluation
+        - Node transition evaluation
+        """)
 
 # Footer
 st.markdown("---")
