@@ -3,6 +3,14 @@ from typing import Optional, List, Any
 from ragas.metrics.base import Metric
 import uuid
 
+# Add langgraph_logs to the options.
+# If the logs are set to true, then instead of eval dataset, the logs are taken into consideration
+# The logs can be pushed to the couchbase cluster.
+# A vaidation engine specificaly for agentic applicaitons that takes in the langgrah logs and validates them.
+# Again we would want to have dataset object to structure the logs and for the references
+# Question: How will the user provide the references, what structure will the evaluation dataset be in?
+
+
 class ExperimentOptions(BaseModel):
     """
     Experiment Configuration
@@ -23,6 +31,10 @@ class ExperimentOptions(BaseModel):
         default = None,
         description="ID of the evaluation dataset (EvalDataset.dataset_id)"
     )
+    langgraph: Optional[bool] = Field(
+        default = False,
+        description="If true, evaluation is performed on the langgraph logs for agentic applications"
+    ) 
     metrics: Optional[List[Any]] = Field(
         default = None,
         description="""

@@ -1,6 +1,6 @@
 # src/data/dataset.py
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional
+from typing import List, Optional, Any
 import json
 import uuid
 
@@ -37,7 +37,23 @@ class EvalDataset(BaseModel):
         description="List of contexts retrieved for the question by the vector store",
         validate_default=True
     )
-    
+    # Agnentic ground truth data
+    reference_tool_calls: Optional[List[List[Dict[str, Any]]]] = Field(
+        default = None,
+        description="List of reference tool calls",
+        validate_default=True
+    )
+    gt_answers: Optional[List[str]] = Field(
+        default = None,
+        description="List of ground truth answers",
+        validate_default=True
+    )
+    gt_tool_outputs: Optional[List[List[str]]] = Field(
+        default = None,
+        description="List of ground truth tool outputs",
+        validate_default=True
+    )
+        
     # Convert the dataset into a list of json objects
     def to_json(self, filename=None):
         # Get the maximum length of provided lists (handling None fields)
@@ -140,6 +156,13 @@ if __name__ == '__main__':
         "responses": ["Paris", "Joe Biden"],
         "reference_contexts": ["Paris is the capital of France", "The USA is a country in North America"],
         "retrieved_contexts": [["Paris is the capital of France", "France is a country in Europe"], ["Washington is the capital of the USA", "The USA is a country in North America"]]
+    }
+    data = {
+        "questions": ["What is the price of copper?", "What is the price of gold?"],
+        "answers": [["The current price of copper is $0.0098 per gram."], ["The current price of gold is $88.16 per gram."]],
+        "responses": [],
+        "reference_contexts": [],
+        "retrieved_contexts": []
     }
     dataset = EvalDataset(**data)
     print(dataset)

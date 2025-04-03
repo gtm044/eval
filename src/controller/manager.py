@@ -9,6 +9,8 @@ from src.data.load import LoadOperator
 from src.data.dataset import EvalDataset
 from couchbase.kv_range_scan import PrefixScan
 from src.evaluator.validation import ValidationEngine
+from src.evaluator.validate_agent import AgentValidationEngine
+from src.langgraph.trace import get_langgraph_logs
 
 class Experiment:
     def __init__(self, dataset: Optional[EvalDataset] = None, options: Optional[ExperimentOptions] = None):
@@ -43,16 +45,23 @@ class Experiment:
         
             if not isinstance(self.dataset, EvalDataset):
                 raise ValueError(f"Failed to load dataset with ID: {self.options.dataset_id}")
+            
+        # If the langgraph option is set to true, then call another function to evaluate the langgraph logs (not implemented yet)
+        if self.options.langgraph:
+            logs = get_langgraph_logs()
+            engine = AgentValidationEngine(langgraph_logs=logs, reference_tool_calls=self.dataset.reference_tool_calls, gt_answers=self.dataset.gt_answers, gt_tool_outputs=self.dataset.gt_tool_outputs)
+            self.output, self.metrics, self.avg_metrics = engine.evaluate()
         
         # Create validation engine and run evaluation
-        validation_engine = ValidationEngine(
-            dataset=self.dataset,
-            metrics=self.options.metrics,
-            segments=self.options.segments
-        )
-        
-        # Run the evaluation
-        self.output, self.metrics, _, self.avg_metrics = validation_engine.evaluate()
+        else:
+            validation_engine = ValidationEngine(
+                dataset=self.dataset,
+                metrics=self.options.metrics,
+                segments=self.options.segments
+            )
+            
+            # Run the evaluation
+            self.output, self.metrics, _, self.avg_metrics = validation_engine.evaluate()
         
         # Rename the .results directory created by the the validationEngine to ".results-experiment_id"
         # If the directory exits, don't rename it
@@ -78,11 +87,12 @@ class Experiment:
             "metrics": self.metric_names,
             "dataset_size": len(self.output),
             "dataset_id": self.options.dataset_id,
+            "integration": "langgraph" if self.options.langgraph else None,
             "avg_metrics": self.avg_metrics
         }
         
-        # Add any custom fields from options to metadata
-        # BaseModel objects don't use __dict__ directly, use model_dump() instead
+        # Add custom_fields
+        # BaseModel objects don't use __dict__ directly, use model_dump()
         options_dict = self.options.model_dump()
         for field_name, field_value in options_dict.items():
             if (field_name not in self.metadata and 
