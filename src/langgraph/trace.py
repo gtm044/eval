@@ -29,7 +29,7 @@ def get_default_save_directory():
     
     return Path(default_dir)
 
-def get_langgraph_logs(file_path: str) -> List[AddableValuesDict]:
+def get_langgraph_logs():
     """
     Get the langgraph logs from the default save path
     """
