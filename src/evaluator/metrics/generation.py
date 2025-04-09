@@ -1,8 +1,11 @@
 import numpy as np
+import os
 from src.utils.nlp import rouge_n, rouge_l, cosine_similarity
 from src.utils.models import openai_embedding
 from nltk.translate.bleu_score import sentence_bleu
 from keybert import KeyBERT
+from typing import List, Optional
+from openai import OpenAI
 
 def rouge_score(answers, responses):
     """
@@ -64,19 +67,84 @@ def response_similarity(answers, responses, method="cosine"):
             similarity = np.dot(answer_embedding, response_embedding)
             similarities.append(round(similarity.item(), 2))
     return similarities
-        
+
+def llm_grading(queries: List[str], ground_truths: List[str], model_answers: List[str], rubric: Optional[str] = ""):
+    """
+    Use an llm to grade the model answer.
+    """
+    EVALUATION_PROMPT = """
+    Your job is to evaluate the performance of an AI-powered question answering system. You will be given a query, a ground truth answer, and the answer given by the AI. Your task is to grade the AI's answer on a scale of 0-10. A score of 0 means the AI's answer is wrong. A score of 10 means the AI's answer is completely correct.
+
+    Your response must ONLY be an integer between 0 and 10 (inclusive). Do not include any other text in your response.
+
+    GUIDELINES FOR GRADING
+    - The ground truth answers are often lacking in detail, so if the AI's answer is more detailed than the ground truth answer, then that's generally a good sign.
+    - Be wary of overly broad or general AI answers. If the AI's answer lacks specifics, then it probably isn't a good answer.
+    - If a grading rubric is included in the GRADING RUBRIC section, then pay close attention to it. The rubric will tell you specific things to look for in the AI's answer.
+    - Maintain high standards when grading. A score of 10 should be reserved for answers that are nearly perfect. Answers that miss key details or don't fully answer the question should be heavily penalized.
+
+    QUERY
+    {query}
+
+    GROUND TRUTH ANSWER
+    {ground_truth_answer}
+
+    GRADING RUBRIC
+    {rubric}
+
+    AI-GENERATED ANSWER
+    {model_answer}
+
+    GRADE
+    """.strip()
+    
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    grades = []
+    for query, ground_truth, model_answer in zip(queries, ground_truths, model_answers):
+        prompt = EVALUATION_PROMPT.format(query=query, ground_truth_answer=ground_truth, rubric=rubric, model_answer=model_answer)
+        chat_messages = [{"role": "user", "content": prompt}]
+        response = client.chat.completions.create(
+            model = "gpt-4o",
+            messages = chat_messages,
+            temperature = 0.0,
+        )
+        grade_output = response.choices[0].message.content.strip()
+        grade = int(grade_output)
+        grades.append(grade)
+    return grades
+
+
+llm_grading.name = "llm_grading"
+
 
 if __name__ == '__main__':
-    answers = [
-        "The quick brown fox jumps over the lazy dog",
-        "The quick brown fox jumps over the lazy dog",
-        "The quick brown fox jumps over the lazy dog"
+    # answers = [
+    #     "The quick brown fox jumps over the lazy dog",
+    #     "The quick brown fox jumps over the lazy dog",
+    #     "The quick brown fox jumps over the lazy dog"
+    # ]
+    # responses = [
+    #     "The quick brown fox jumps over the lazy dog",
+    #     "The quick brown fox jumps over the lazy dog",
+    #     "India is the capital of new delhi and dog jumps"
+    # ]
+    # print(rouge_score(answers, responses))
+    # print(bleu_score(answers, responses))
+    # print(faithfulness(answers, responses))
+    
+    queries = [
+        "What is the capital of India?",
+        "Who is the president of the United States?",
+        "What is the capital of the moon?"
     ]
-    responses = [
-        "The quick brown fox jumps over the lazy dog",
-        "The quick brown fox jumps over the lazy dog",
-        "India is the capital of new delhi and dog jumps"
+    ground_truths = [
+        "New Delhi",
+        "Joe Biden",
+        "London"
     ]
-    print(rouge_score(answers, responses))
-    print(bleu_score(answers, responses))
-    print(faithfulness(answers, responses))
+    model_answers = [
+        "New Delhi",
+        "Joe Jilden",
+        "London"
+    ]
+    print(llm_grading(queries, ground_truths, model_answers))

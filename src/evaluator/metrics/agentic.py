@@ -9,6 +9,7 @@
 from typing import List, Dict, Any
 from src.utils.models import openai_embedding
 from src.utils.nlp import cosine_similarity
+from src.utils.models import llm_as_a_judge
 
 def tool_call_accuracy(tool_calls: List[List[Any]], reference_tool_calls: List[List[Dict[str, Any]]]) -> float:
     """Calculate tool call accuracy.
@@ -40,7 +41,7 @@ def tool_call_accuracy(tool_calls: List[List[Any]], reference_tool_calls: List[L
                         matching_values = sum(1 for k in common_keys if agent_call["args"][k] == ref_call["args"][k])
                         args_match = matching_values / max(len(ref_call["args"]), 1)
                     
-                    # Combined match score (50% for name, 50% for args)
+                    # Combined match score (50 for name, 50 for args)
                     matches += (name_match * 0.5 + args_match * 0.5)
             
             conv_accuracy = matches / max(len(ref_calls), 1)
@@ -83,31 +84,28 @@ def answer_faithfulness(ai_messages: List[List[Any]], tool_outputs: List[List[st
         if conv_ai_messages and tool_outputs:
             # Simple check: does the final answer contain the tool output? -> bs, should use some kind of an llm based judge 
             final_answer = conv_ai_messages[-1]
-            faithfulness = 0.0
-            for output in tool_outputs:
-                if output in final_answer:
-                    faithfulness = 1.0
-                    break
+            faithfulness = llm_as_a_judge(final_answer, tool_outputs)
             answer_faithfulness.append(faithfulness)
     return answer_faithfulness
 
 
-def tool_correctness(human_messages: List[str], tool_calls: List[List[Any]]) -> float:
-    """Calculate tool correctness.
+### NO SENSE TO INCLUDE THIS METRIC AS OF NOW
+# def tool_correctness(human_messages: List[str], tool_calls: List[List[Any]]) -> float:
+#     """Calculate tool correctness.
     
-    Args:
-        langgraph_logs: List of lists of dictionaries containing conversation logs
+#     Args:
+#         langgraph_logs: List of lists of dictionaries containing conversation logs
 
-    Returns:
-        float: Tool correctness
-    """
-    tool_correctness = []
-    for i, (human_message, tool_calls) in enumerate(zip(human_messages, tool_calls)):
-        # Simplified implementation: always rate 1.0 if there are tool calls
-        # In a real implementation, this would need NLP to check relevance
-        correctness = 1.0 if tool_calls else 0.0
-        tool_correctness.append(correctness)
-    return tool_correctness
+#     Returns:
+#         float: Tool correctness
+#     """
+#     tool_correctness = []
+#     for i, (human_message, tool_calls) in enumerate(zip(human_messages, tool_calls)):
+#         # Simplified implementation: always rate 1.0 if there are tool calls
+#         # In a real implementation, this would need NLP to check relevance
+#         correctness = 1.0 if tool_calls else 0.0
+#         tool_correctness.append(correctness)
+#     return tool_correctness
 
 
 def tool_accuracy(tool_outputs: List[List[str]], gt_tool_outputs: List[List[str]]) -> float:
@@ -121,9 +119,26 @@ def tool_accuracy(tool_outputs: List[List[str]], gt_tool_outputs: List[List[str]
     """
     tool_accuracy = []
     for i, (tool_output, gt_output) in enumerate(zip(tool_outputs, gt_tool_outputs)):
+        # Basic string matching implementationnas of now, need to find something more relevant
+        #Cosine similarity -> bw the ground truth tool output and the tool output
         if tool_output and gt_output:
-            matches = sum(1 for a, b in zip(tool_output, gt_output) if a == b)
-            accuracy = matches / max(len(gt_output), 1)
+            # Calculate cosine similarity between tool outputs and ground truth
+            similarities = []
+            for a, b in zip(tool_output, gt_output):
+                # Convert to string if not already
+                a_str = str(a)
+                b_str = str(b)
+                
+                # Get embeddings
+                a_embedding = openai_embedding(a_str)
+                b_embedding = openai_embedding(b_str)
+                
+                # Calculate cosine similarity
+                similarity = cosine_similarity([a_embedding], [b_embedding])[0][0]
+                similarities.append(similarity)
+            
+            # Average similarity across all tool outputs
+            accuracy = sum(similarities) / max(len(similarities), 1)
             tool_accuracy.append(accuracy)
     return tool_accuracy
 
@@ -131,5 +146,4 @@ def tool_accuracy(tool_outputs: List[List[str]], gt_tool_outputs: List[List[str]
 tool_call_accuracy.name = "tool_call_accuracy"
 answer_correctness.name = "answer_correctness"
 answer_faithfulness.name = "answer_faithfulness"
-tool_correctness.name = "tool_correctness"
 tool_accuracy.name = "tool_accuracy"

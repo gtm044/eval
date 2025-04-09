@@ -98,6 +98,7 @@ class EvalDataset(BaseModel):
         reference_contexts = []
         retrieved_contexts = []
         
+        
         # Extract data from each document
         for doc in data:
             if doc.get("question") is not None:

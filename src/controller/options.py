@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Any
 from ragas.metrics.base import Metric
 import uuid
-
+from src.evaluator.metrics import llm_grading
 # Add langgraph_logs to the options.
 # If the logs are set to true, then instead of eval dataset, the logs are taken into consideration
 # The logs can be pushed to the couchbase cluster.
@@ -48,6 +48,7 @@ class ExperimentOptions(BaseModel):
             - avg_chunk_size
             - context_similarity
             - context_score
+            - llm_grading
         """
     )
     segments: Optional[List[str]] = Field( # Yet to implement
@@ -94,7 +95,7 @@ class ExperimentOptions(BaseModel):
         
         # Validate metric names
         for metric_name in metric_names:
-            if metric_name not in ["context_precision", "context_recall", "answer_relevancy", "faithfulness", "answer_correctness", "avg_chunk_size", "context_similarity", "context_score", "named_entity_score", "semantic_similarity"]:  
+            if metric_name not in ["context_precision", "context_recall", "answer_relevancy", "faithfulness", "answer_correctness", "avg_chunk_size", "context_similarity", "context_score", "named_entity_score", "semantic_similarity", "llm_grading"]:  
                 raise ValueError(f"{metric_name} doesn't exist.")
         
         return v
@@ -107,7 +108,7 @@ if __name__=='__main__':
         experimentOptions = ExperimentOptions(
             experiment_id="test_exp_001",
             dataset_id="sample_dataset_123",
-            metrics=[faithfulness, avg_chunk_size],
+            metrics=[llm_grading],
             chunk_size=512,
             chunk_overlap=50,
             embedding_model="sentence-transformers/all-mpnet-base-v2",
@@ -125,7 +126,7 @@ if __name__=='__main__':
         print(f"Error: {e}")
         
     # Print metric names
-    metrics = [faithfulness, avg_chunk_size]
+    metrics = [llm_grading]
     print("\nMetrics:")
     for metric in metrics:
         print(f"- {metric.name}")

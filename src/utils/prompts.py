@@ -16,13 +16,14 @@ synthetic_valid_answer_template = jinja_env.get_template('synthetic_valid_answer
 synthetic_valid_short_answer_template = jinja_env.get_template('synthetic_valid_short_answer_prompt.jinja')
 expand_documents_template = jinja_env.get_template('expand_documents_prompt.jinja')
 parse_langchain_logs_template = jinja_env.get_template('langchain_log_extractor_prompt.jinja')
-
+llm_judge_template = jinja_env.get_template('llm_judge.jinja')
 # Get prompt strings (default rendering without parameters)
 synthetic_query_prompt = synthetic_query_template.render()
 synthetic_valid_answer_prompt = synthetic_valid_answer_template.render()
 synthetic_valid_short_answer_prompt = synthetic_valid_short_answer_template.render()
 expand_documents_prompt = expand_documents_template.render()
 parse_langchain_logs_prompt = parse_langchain_logs_template.render()
+llm_judge_prompt = llm_judge_template.render()
 
 # Functions to render templates with parameters
 def render_synthetic_query_prompt(**kwargs):

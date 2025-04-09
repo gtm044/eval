@@ -6,7 +6,7 @@ import os
 from typing import Dict, List, Optional, Any
 from src.utils.models import openai_embedding
 from src.utils.nlp import cosine_similarity
-from src.evaluator.metrics.agentic import tool_call_accuracy, answer_correctness, answer_faithfulness, tool_correctness, tool_accuracy
+from src.evaluator.metrics.agentic import tool_call_accuracy, answer_correctness, answer_faithfulness, tool_accuracy
 
 
 class AgentValidationEngine:
@@ -32,7 +32,7 @@ class AgentValidationEngine:
         self.gt_answers = gt_answers
         self.gt_tool_outputs = gt_tool_outputs
         self.prepped_data = None
-        self.metrics = [tool_call_accuracy, answer_correctness, answer_faithfulness, tool_correctness, tool_accuracy]
+        self.metrics = [tool_call_accuracy, answer_correctness, answer_faithfulness, tool_accuracy]
         self.prep()
 
     def prep(self) -> Dict[str, Any]:
@@ -94,7 +94,6 @@ class AgentValidationEngine:
             "tool_call_accuracy": [],
             "answer_correctness": [],
             "answer_faithfulness": [],
-            "tool_correctness": [],
             "tool_accuracy": []
         }
         
@@ -110,7 +109,7 @@ class AgentValidationEngine:
         results["answer_faithfulness"] = answer_faithfulness(self.prepped_data["ai_messages"], self.prepped_data["tool_outputs"])
         
         # Tool Correctness - Check if the tool called is relevant to the user question
-        results["tool_correctness"] = tool_correctness(self.prepped_data["human_messages"], self.prepped_data["tool_calls"])
+        # results["tool_correctness"] = tool_correctness(self.prepped_data["human_messages"], self.prepped_data["tool_calls"])
         
         # Tool Accuracy - Compare tool outputs with ground truth tool outputs
         if self.gt_tool_outputs:
@@ -118,7 +117,7 @@ class AgentValidationEngine:
         
         # The results should be processes as in @evaluator/validation.py
         results_json_list = []
-        for data_point in zip(self.prepped_data["human_messages"], self.prepped_data["tool_calls"], self.prepped_data["ai_messages"], self.prepped_data["tool_outputs"], self.gt_answers, self.gt_tool_outputs, self.reference_tool_calls, results["tool_call_accuracy"], results["answer_correctness"], results["answer_faithfulness"], results["tool_correctness"], results["tool_accuracy"]):
+        for data_point in zip(self.prepped_data["human_messages"], self.prepped_data["tool_calls"], self.prepped_data["ai_messages"], self.prepped_data["tool_outputs"], self.gt_answers, self.gt_tool_outputs, self.reference_tool_calls, results["tool_call_accuracy"], results["answer_correctness"], results["answer_faithfulness"], results["tool_accuracy"]):
             result_point = {
                 "human_message": data_point[0],
                 "tool_calls": data_point[1],
@@ -130,8 +129,7 @@ class AgentValidationEngine:
                 "tool_call_accuracy": data_point[7],
                 "answer_correctness": data_point[8],
                 "answer_faithfulness": data_point[9],
-                "tool_correctness": data_point[10],
-                "tool_accuracy": data_point[11]
+                "tool_accuracy": data_point[10]
             }
             results_json_list.append(result_point)
                 
@@ -183,7 +181,7 @@ if __name__ == "__main__":
         )
         
         prepped_data = engine.prep()
-        eval_results, avg_metrics = engine.evaluate()
+        eval_results, _, avg_metrics = engine.evaluate()
         
         # Save eval_results to a json file
         with open("eval_results.json", "w") as f:

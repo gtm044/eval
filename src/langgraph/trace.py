@@ -209,6 +209,12 @@ def log_lang_stream() -> str:
 
     print(f"Results saved to {file_path} with {len(serializable_results)} conversations")
     
+    # Load the results to couchbase -> but in the case f evaldataset, we save the complete ground truth dataset to the cluster, 
+    # Loading the logs alone makes no sense, or combine the logs with the ground truth dataset, should find a way to retrieve and load without affecting the current implementation 
+    # Best way is to load the langgraph logs to the evaldataset, but will have to change everything, the automated feature becomes 
+    
+    
+    
     # Clear tracking list after processing
     tracking_list.clear()
     

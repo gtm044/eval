@@ -7,7 +7,7 @@ import pandas as pd
 import os
 import ragas
 from ragas import evaluate
-from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity, context_similarity, context_score
+from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity, context_similarity, context_score, llm_grading
 # from ragas.metrics._factual_correctness import FactualCorrectness
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
@@ -66,10 +66,11 @@ class ValidationEngine:
         avg_chunk_size_result = None
         context_similarity_result = None
         context_score_result = None
+        llm_grading_result = None
         
         self.temp_metrics = self.metrics.copy()
                     
-        # Check if avg_chunk_size is in the metrics list, if present, remove it calculate the avg chunk size
+        # Check if the custom metrics are present, if so calculate the metrics and remove them from the list
         if self.metrics:
             # Create a list to track metrics to remove
             metrics_to_remove = []
@@ -88,13 +89,27 @@ class ValidationEngine:
                     metrics_to_remove.append(i)
                     print("Calculating context score...")
                     context_score_result = context_score(self.dataset.reference_contexts, self.dataset.retrieved_contexts)
-            
+                elif metric.name == "llm_grading":
+                    metrics_to_remove.append(i)
+                    print("Calculating llm grading...")
+                    # Extract the first string from each list in the answers list of lists
+                    prime_answers = [answer_list[0] for answer_list in self.dataset.answers] if self.dataset.answers else []
+                    llm_grading_result = llm_grading(queries=self.dataset.questions, ground_truths=prime_answers, model_answers=self.dataset.responses)
+                    
             # Remove metrics in reverse order to avoid index shifting
             for i in sorted(metrics_to_remove, reverse=True):
                 self.temp_metrics.pop(i)
-                
-            results = ragas.evaluate(dataset=golden_dataset, metrics=self.temp_metrics, show_progress=True)
             
+            if len(self.temp_metrics)>0:
+                results = ragas.evaluate(dataset=golden_dataset, metrics=self.temp_metrics, show_progress=True)
+            # Fix this headache, if ragas metrics are not provided then we dont have a results object, can we create a rags result object with nothing?
+            else:
+                # Create a pandas dataframe with the same structure as the results dataframe
+                results = pd.DataFrame(columns=["user_input", "retrieved_contexts", "response", "reference"])
+                results["user_input"] = self.dataset.questions
+                results["retrieved_contexts"] = self.dataset.retrieved_contexts
+                results["response"] = self.dataset.responses
+                results["reference"] = self.dataset.reference_contexts
         else:
             # Try to evaluate with default metrics, but handle errors for incompatible metrics
             try:
@@ -122,8 +137,9 @@ class ValidationEngine:
                 print(f"Evaluating with applicable metrics: {[m.name for m in applicable_metrics]}")
                 results = ragas.evaluate(dataset=golden_dataset, metrics=applicable_metrics, show_progress=True)
         
-        # Convert to pandas DataFrame
-        df = results.to_pandas()
+
+        # Convert to pandas DataFrame if results is not of type dataframe
+        df = results.to_pandas() if not isinstance(results, pd.DataFrame) else results
         
         if self.dataset.answers is not None:
             df["ground_truth_answer"] = self.dataset.answers
@@ -139,6 +155,10 @@ class ValidationEngine:
         # Add the context score result to the results
         if context_score_result is not None:
             df["context_score"] = context_score_result
+            
+        # Add the llm grading result to the results
+        if llm_grading_result is not None:
+            df["llm_grading"] = llm_grading_result
             
         # Create results directory if it doesn't exist
         results_dir = ".results"
@@ -199,7 +219,8 @@ if __name__=='__main__':
     _dataset = EvalDataset(**data)
     
     # Single-turn evaluation
-    metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size, context_similarity, context_score]
+    # metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size, context_similarity, context_score]
+    metrics = [llm_grading]
     eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics) # Dont provide metrics if you want to use the default metrics
     results, metrics, schema, avg_metrics = eval_engine.evaluate()
     print("Single-turn evaluation results:")

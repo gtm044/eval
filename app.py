@@ -16,7 +16,8 @@ from src.evaluator.metrics import (
     avg_chunk_size, 
     context_similarity, 
     context_score,
-    named_entity_score
+    named_entity_score,
+    llm_grading
 )
 from src.evaluator.validation import ValidationEngine
 from src.data.load import LoadOperator
@@ -131,10 +132,15 @@ if option == "Generate Data":
                     
                     with st.spinner("Generating synthetic data..."):
                         if file_format == "csv":
+                            df = pd.read_csv("temp_upload.csv")
+                            df = df[:limit]
+                            temp_path = "temp_cleaned_upload.csv"
+                            df.to_csv(temp_path, index=False)   
                             generated_data = generator.synthesize_from_csv(
-                                path="temp_upload.csv",
+                                path=temp_path,
                                 metadata=metadata
                             )
+                            os.remove(temp_path)
                         else:  # json
                             field_param = field if field else None
                             documents = generator.load_from_json(
@@ -321,8 +327,12 @@ elif option == "Evaluate":
                     with open("temp_dataset.json", "wb") as f:
                         f.write(uploaded_file.getbuffer())
                     
+                    # Load the JSON data first
+                    with open("temp_dataset.json", "r") as f:
+                        json_data = json.load(f)
+                    
                     # Load dataset
-                    dataset = EvalDataset.from_json("temp_dataset.json")
+                    dataset = EvalDataset(**json_data)
                     
                     # Store in session state
                     st.session_state.evaluation_dataset_loaded = True
@@ -334,7 +344,7 @@ elif option == "Evaluate":
                     st.error(f"Error loading dataset: {str(e)}")
         
         with dataset_source_tab2:
-            st.write("Load dataset from Couchbase")
+            st.write("Load dataset from Couchbase: Try sample dataset id: d37a7fc1-a59d-4a06-91f5-852e58ea9fb7")
             
             # Check if Couchbase credentials are available
             if (os.environ.get("cluster_url") and 
@@ -402,6 +412,7 @@ elif option == "Evaluate":
                 use_answer_relevancy = st.checkbox("Answer Relevancy", value=True)
                 use_context_recall = st.checkbox("Context Recall", value=True)
                 use_context_precision = st.checkbox("Context Precision", value=True)
+                use_llm_grading = st.checkbox("LLM Grading", value=True)
             
             with col2:
                 use_answer_correctness = st.checkbox("Answer Correctness", value=True)
@@ -420,6 +431,7 @@ elif option == "Evaluate":
                 if use_avg_chunk_size: metrics.append(avg_chunk_size)
                 if use_context_similarity: metrics.append(context_similarity)
                 if use_context_score: metrics.append(context_score)
+                if use_llm_grading: metrics.append(llm_grading)
                 
                 with st.spinner("Running evaluation..."):
                     # Run evaluation
@@ -527,7 +539,7 @@ elif option == "Experiment":
                     dataset_loaded = False
         
         # Experiment configuration
-        st.subheader("Experiment Configuration")
+        st.subheader("Experiment Metadata")
         
         experiment_id = st.text_input("Experiment ID", value=st.session_state.experiment_id)
         st.session_state.experiment_id = experiment_id
@@ -535,13 +547,13 @@ elif option == "Experiment":
         col1, col2 = st.columns(2)
         
         with col1:
-            chunk_size = st.number_input("Chunk Size", min_value=1, value=512)
-            chunk_overlap = st.number_input("Chunk Overlap", min_value=0, value=50)
-            embedding_model = st.text_input("Embedding Model", value="sentence-transformers/all-mpnet-base-v2")
+            chunk_size = st.number_input("Chunk Size", min_value=1, value=None)
+            chunk_overlap = st.number_input("Chunk Overlap", min_value=0, value=None)
+            embedding_model = st.text_input("Embedding Model", value="")
         
         with col2:
-            embedding_dimension = st.number_input("Embedding Dimension", min_value=1, value=768)
-            llm_model = st.text_input("LLM Model", value="gpt-4o-mini")
+            embedding_dimension = st.number_input("Embedding Dimension", min_value=1, value=None)
+            llm_model = st.text_input("LLM Model", value="")
         
         # Metrics selection
         st.subheader("Select Evaluation Metrics")
@@ -553,6 +565,7 @@ elif option == "Experiment":
             use_answer_relevancy = st.checkbox("Answer Relevancy", value=True, key="exp_ans_rel")
             use_context_recall = st.checkbox("Context Recall", value=True, key="exp_ctx_recall")
             use_context_precision = st.checkbox("Context Precision", value=True, key="exp_ctx_prec")
+            use_llm_grading = st.checkbox("LLM Grading", value=True, key="exp_llm_grading")
         
         with col2:
             use_answer_correctness = st.checkbox("Answer Correctness", value=True, key="exp_ans_corr")
@@ -568,9 +581,13 @@ elif option == "Experiment":
                 if dataset_source == "Upload JSON":
                     with open("temp_dataset.json", "wb") as f:
                         f.write(uploaded_file.getbuffer())
+                        
+                    # et the json dict
+                    with open("temp_dataset.json", "r") as f:
+                        json_data = json.load(f)
                     
                     # Load dataset
-                    dataset = EvalDataset.from_json("temp_dataset.json")
+                    dataset = EvalDataset(**json_data)
                     st.session_state.experiment_dataset = dataset
                 else:
                     # Dataset already loaded from Couchbase
@@ -586,6 +603,7 @@ elif option == "Experiment":
                 if use_avg_chunk_size: metrics.append(avg_chunk_size)
                 if use_context_similarity: metrics.append(context_similarity)
                 if use_context_score: metrics.append(context_score)
+                if use_llm_grading: metrics.append(llm_grading)
                 
                 # Create experiment options
                 options = ExperimentOptions(
@@ -937,40 +955,6 @@ elif option == "Result Analysis":
                         'max': '{:.3f}'
                     })
                     st.dataframe(formatted_summary)
-                    
-                    # 3. Distribution overview
-                    st.subheader("Metrics Distribution Overview")
-                    
-                    # Create violin plots for selected metrics
-                    fig = go.Figure()
-                    
-                    for metric in selected_metrics:
-                        # Filter out invalid values for precision/recall metrics
-                        metric_data = df[metric]
-                        if metric.endswith('precision') or metric.endswith('recall') or metric == 'faithfulness' or metric == 'answer_relevancy':
-                            # Filter values to be between 0 and 1 for metrics that should be bounded
-                            metric_data = metric_data.clip(0, 1)
-                        
-                        fig.add_trace(go.Violin(
-                            y=metric_data,
-                            name=metric,
-                            box_visible=True,
-                            meanline_visible=True
-                        ))
-                    
-                    fig.update_layout(
-                        title="Distribution of Selected Metrics",
-                        xaxis_title="Metric",
-                        yaxis_title="Value",
-                        height=500
-                    )
-                    
-                    # Add appropriate y-axis bounds for precision/recall metrics
-                    if all(m.endswith('precision') or m.endswith('recall') or m == 'faithfulness' or m == 'answer_relevancy' for m in selected_metrics):
-                        fig.update_layout(yaxis=dict(range=[0, 1]))
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
                     
                     # 5. Metric Accuracy Analysis (percentage of results meeting quality thresholds)
                     st.subheader("Metric Quality Analysis")
@@ -1686,10 +1670,10 @@ elif option == "Compare Experiments":
                 
                 ### Cohen's d
                 Measures effect size - the standardized difference between two means:
-                - < 0.2: Negligible effect
+                - Less than 0.2: Negligible effect
                 - 0.2 - 0.5: Small effect
                 - 0.5 - 0.8: Medium effect
-                - > 0.8: Large effect
+                - More than 0.8: Large effect
                 """)
                 
 elif option == "Docs":
