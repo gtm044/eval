@@ -137,9 +137,9 @@ get_agent_response(["What is the price of copper?", "What is the price of gold?"
 
 log_lang_stream()
 
-from eval.src.data.dataset import EvalDataset
-from eval.src.controller.options import ExperimentOptions
-from eval.src.controller.manager import Experiment
+from src.data.dataset import EvalDataset
+from src.controller.options import ExperimentOptions
+from src.controller.manager import Experiment
 
 reference_tool_calls = [
     [{"name": "get_metal_price", "args": {"metal_name": "copper"}}],
