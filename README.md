@@ -12,7 +12,7 @@ This framework provides tools and metrics to evaluate RAG systems across three k
 
 The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management, storage and result persistence. It also supports tracing and evaluating agentic pipelines built with LangChain and LangGraph.
 
-## Features
+<!-- ## Features
 
 ### 1. Evaluation Dataset Management
 - Structured data class ([`EvalDataset`](src/data/dataset.py)) for managing evaluation datasets
@@ -54,7 +54,7 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 ### 5. Agent Tracing and Evaluation
 - Support for LangGraph trace logging and analysis
 - LangChain tracing with comprehensive event capture
-- Agent validation engine for evaluating LLM agents
+- Agent validation engine for evaluating LLM agents -->
 
 ## Installation
 
@@ -71,7 +71,7 @@ The framework uses environment variables for Couchbase and OpenAI configurations
 
 ## Usage
 
-Example usage provided in [`example.ipynb`](examples/rag_eval.ipynb)
+A complete workflow example provided in [`example.ipynb`](examples/rag_eval.ipynb)
 
 ### Synthetic Data Generation
 
@@ -213,7 +213,7 @@ Example provided in [`agentic_evaluation`](examples/agent_langgraph.py)
 # LangGraph tracing
 from eval.src.langgraph.trace import track_variable, log_lang_stream
 
-@track_variable("stream")
+@track_variable("stream") # Provide the variable that stores the result of the .stream function call
 def run_agent(query):
     # Your LangGraph agent implementation
     # ...
