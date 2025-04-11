@@ -68,7 +68,7 @@ def response_similarity(answers, responses, method="cosine"):
             similarities.append(round(similarity.item(), 2))
     return similarities
 
-def llm_grading(queries: List[str], ground_truths: List[str], model_answers: List[str], rubric: Optional[str] = ""):
+def llm_grading(queries: List[str], ground_truths: List[str], model_answers: List[str], rubrics: Optional[List[str]] = None):
     """
     Use an llm to grade the model answer.
     """
@@ -100,7 +100,7 @@ def llm_grading(queries: List[str], ground_truths: List[str], model_answers: Lis
     
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     grades = []
-    for query, ground_truth, model_answer in zip(queries, ground_truths, model_answers):
+    for query, ground_truth, model_answer, rubric in zip(queries, ground_truths, model_answers, rubrics):
         prompt = EVALUATION_PROMPT.format(query=query, ground_truth_answer=ground_truth, rubric=rubric, model_answer=model_answer)
         chat_messages = [{"role": "user", "content": prompt}]
         response = client.chat.completions.create(
@@ -133,18 +133,32 @@ if __name__ == '__main__':
     # print(faithfulness(answers, responses))
     
     queries = [
-        "What is the capital of India?",
-        "Who is the president of the United States?",
-        "What is the capital of the moon?"
+        "What are the key factors that contribute to climate change?",
+        "Explain the process of machine learning and its applications in healthcare.",
+        "What were the main causes of World War II?",
+        "Describe the structure and function of DNA in human cells.",
+        "What are the economic implications of implementing a universal basic income?"
     ]
     ground_truths = [
-        "New Delhi",
-        "Joe Biden",
-        "London"
+        "Climate change is primarily caused by greenhouse gas emissions from burning fossil fuels, deforestation, industrial processes, and agricultural practices. These activities increase atmospheric CO2 and other greenhouse gases, trapping heat and raising global temperatures.",
+        "Machine learning is a subset of AI where algorithms learn patterns from data to make predictions or decisions without explicit programming. In healthcare, it's used for disease diagnosis, treatment recommendation, patient monitoring, drug discovery, and medical image analysis.",
+        "World War II was caused by multiple factors including the harsh Treaty of Versailles, the Great Depression, the rise of fascism and militarism in Germany, Italy, and Japan, appeasement policies by Western powers, and Hitler's aggressive expansionism.",
+        "DNA is a double-helix structure composed of nucleotides containing phosphate groups, deoxyribose sugar, and nitrogenous bases. It stores genetic information, replicates during cell division, and directs protein synthesis through transcription and translation processes.",
+        "Implementing universal basic income could reduce poverty and income inequality, provide economic security, stimulate consumer spending, and support entrepreneurship. However, it may increase inflation, reduce work incentives, and require significant tax increases or budget reallocations."
     ]
     model_answers = [
-        "New Delhi",
-        "Joe Jilden",
-        "London"
+        "Climate change is mainly caused by human activities that release greenhouse gases into the atmosphere, particularly from burning fossil fuels like coal and oil. Deforestation and industrial processes also contribute significantly.",
+        "Machine learning involves training algorithms on data to identify patterns and make predictions. In healthcare, it's revolutionizing diagnosis through image analysis, personalizing treatment plans, predicting patient outcomes, and accelerating drug discovery.",
+        "The primary causes of World War II included economic hardship from the Great Depression, the rise of totalitarian regimes, and territorial ambitions of Nazi Germany. The failure of the League of Nations and appeasement policies also played important roles.",
+        "DNA is a molecule that carries genetic instructions for development and functioning of all living organisms. It has a double-helix structure made of nucleotides, with complementary base pairs forming the rungs of the ladder-like structure.",
+        "A universal basic income would provide regular payments to all citizens regardless of employment status. This could reduce poverty and provide economic security, but might decrease workforce participation and would require significant government funding."
     ]
-    print(llm_grading(queries, ground_truths, model_answers))
+    rubrics = [
+        "Evaluate the answer based on scientific accuracy, comprehensiveness of causes mentioned, and explanation of the greenhouse effect mechanism. Higher scores for answers that include both human and natural factors with appropriate emphasis on human contributions.",
+        "Grade based on technical accuracy of ML explanation, breadth of healthcare applications mentioned, and depth of explanation about how ML improves healthcare outcomes. Consider whether limitations and ethical considerations are addressed.",
+        "Assess the answer on historical accuracy, comprehensiveness of causes (political, economic, social factors), chronological understanding, and balanced perspective on different nations' roles in the conflict.",
+        "Evaluate based on structural accuracy (nucleotides, base pairs, double helix), functional explanation (genetic code, protein synthesis), and clarity of the relationship between structure and function.",
+        "Grade based on balanced coverage of both potential benefits and drawbacks, economic theory application, consideration of implementation challenges, and discussion of real-world examples or pilot programs."
+    ]
+    print(llm_grading(queries, ground_truths, model_answers, rubrics))
+    

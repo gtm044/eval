@@ -124,9 +124,3 @@ if __name__=='__main__':
         print(f"Metrics: {experimentOptions.metrics}")
     except ValueError as e:
         print(f"Error: {e}")
-        
-    # Print metric names
-    metrics = [llm_grading]
-    print("\nMetrics:")
-    for metric in metrics:
-        print(f"- {metric.name}")

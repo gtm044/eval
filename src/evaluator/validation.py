@@ -8,7 +8,6 @@ import os
 import ragas
 from ragas import evaluate
 from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity, context_similarity, context_score, llm_grading
-# from ragas.metrics._factual_correctness import FactualCorrectness
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -22,6 +21,7 @@ class ValidationEngine:
         dataset: EvalDataset,
         metrics: Optional[List[Any]] = None,
         segments: Optional[List[str]] = None,
+        rubrics: Optional[List[str]] = None,
     ):
         """
         Initialize the ValidationEngine with dataset and validation options.
@@ -34,7 +34,7 @@ class ValidationEngine:
         self.dataset = dataset
         self.metrics = metrics
         self.segments = segments
-        
+        self.rubrics = rubrics
     
     def evaluate(self):
         """
@@ -94,7 +94,7 @@ class ValidationEngine:
                     print("Calculating llm grading...")
                     # Extract the first string from each list in the answers list of lists
                     prime_answers = [answer_list[0] for answer_list in self.dataset.answers] if self.dataset.answers else []
-                    llm_grading_result = llm_grading(queries=self.dataset.questions, ground_truths=prime_answers, model_answers=self.dataset.responses)
+                    llm_grading_result = llm_grading(queries=self.dataset.questions, ground_truths=prime_answers, model_answers=self.dataset.responses, rubrics=self.rubrics)
                     
             # Remove metrics in reverse order to avoid index shifting
             for i in sorted(metrics_to_remove, reverse=True):

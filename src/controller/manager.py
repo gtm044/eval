@@ -57,7 +57,8 @@ class Experiment:
             validation_engine = ValidationEngine(
                 dataset=self.dataset,
                 metrics=self.options.metrics,
-                segments=self.options.segments
+                segments=self.options.segments,
+                rubrics=getattr(self.options, 'rubrics', None)
             )
             
             # Run the evaluation
