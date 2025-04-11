@@ -8,8 +8,9 @@ This framework provides tools and metrics to evaluate RAG systems across three k
 - Chunking evaluation
 - Retrieval evaluation
 - Generation evaluation
+- Agentic evaluation
 
-The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management, storage and result persistence.
+The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management, storage and result persistence. It also supports tracing and evaluating agentic pipelines built with LangChain and LangGraph.
 
 ## Features
 
@@ -33,6 +34,12 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 - Faithfulness evaluation
 - Answer correctness
 
+#### Agentic Metrics
+- Tool call accuracy - Compares agent's tool calls with reference tool calls
+- Answer correctness - Compares final AI responses with ground truth answers
+- Answer faithfulness - Checks if AI's answer is faithful to the tool outputs
+- Tool accuracy - Compares tool outputs with ground truth tool outputs
+
 ### 3. Experiment Management
 - Structured experiment tracking with unique experiment IDs
 - Metadata management including chunking, embedding, and LLM parameters
@@ -43,6 +50,11 @@ The framework integrates with RAGAS, a popular RAG evaluation library, and provi
 - Synthetic ground-truth generation
 - Document processing capabilities
 - Support for multiple input formats
+
+### 5. Agent Tracing and Evaluation
+- Support for LangGraph trace logging and analysis
+- LangChain tracing with comprehensive event capture
+- Agent validation engine for evaluating LLM agents
 
 ## Installation
 
@@ -191,14 +203,46 @@ experiment_result = Experiment().retrieve(experiment_id="exp_001")
 ```
 Results are stored in `.results-<experiment_id>`
 
+### Agent Evaluation
+
+Example provided in [`agentic_evaluation`](examples/agent_langgraph.py)
+
+### Tracing LangGraph and LangChain
+
+```python
+# LangGraph tracing
+from eval.src.langgraph.trace import track_variable, log_lang_stream
+
+@track_variable("stream")
+def run_agent(query):
+    # Your LangGraph agent implementation
+    # ...
+    return stream
+
+# Run the agent
+run_agent("What is the price of copper?")
+
+# Save the logs
+log_lang_stream()
+
+# LangChain tracing
+from eval.src.langchain.trace import interceptor
+
+# Create a LangChain agent with the interceptor
+agent = Agent(..., callbacks=[interceptor])
+
+# Run the agent
+agent.invoke({"input": "What is the price of gold?"})
+
+# Save the logs
+interceptor.log()
+```
 
 ## Roadmap
 
-1. **Basic features**
-   - Custom metric integration
+1. **Advanced features**
    - Multi-turn conversation evaluation
-   - Composite, multi-hop question answer generator.
-   - Generating multiple ground truth answers for a given document
+   - Composite, multi-hop question answer generator
 
 2. **Multimodal RAG Support**
    - Image retrieval evaluation
@@ -206,5 +250,6 @@ Results are stored in `.results-<experiment_id>`
    - Cross-modal metrics
 
 3. **Agentic Evaluation**
-    - Tool call evaluation.
-    - Node transition evaluation.
+   - Advanced tool call evaluation
+   - Node transition evaluation
+   - Context-aware evaluation for complex agentic workflows
