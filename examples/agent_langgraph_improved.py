@@ -1,9 +1,7 @@
 import os
 from dotenv import load_dotenv
 import json
-# from logger import log_lang_stream, log_lang
-# from logger import track_variable
-from src.langgraph.trace import log_lang_stream, track_variable
+from src.langgraph.trace_improved import create_traced_agent, log_traces, TraceContext
 load_dotenv()
 
 metal_price = {
@@ -57,7 +55,7 @@ def get_metal_price(metal_name: str) -> float:
         metal_name = metal_name.lower().strip()
         if metal_name not in metal_price:
             raise KeyError(
-                f"Metal '{metal_name}' not found. Available metals: {', '.join(metal_price['metals'].keys())}"
+                f"Metal '{metal_name}' not found. Available metals: {', '.join(metal_price.keys())}"
             )
         return metal_price[metal_name]
     except Exception as e:
@@ -110,6 +108,7 @@ tool_node = ToolNode(tools)
 from langgraph.graph import START, StateGraph
 from IPython.display import Image, display
 
+# Build the graph
 builder = StateGraph(GraphState)
 builder.add_node("assistant", assistant)
 builder.add_node("tools", tool_node)
@@ -117,23 +116,92 @@ builder.add_edge(START, "assistant")
 builder.add_conditional_edges("assistant", should_continue, ["tools", END])
 builder.add_edge("tools", "assistant")
 
+# Compile the graph
 react_graph = builder.compile()
 # display(Image(react_graph.get_graph(xray=True).draw_mermaid_png()))
 
 from langchain_core.messages import HumanMessage
 
-@track_variable(variable_name="result_stream", human_message="convo")
-def get_agent_response(convo):
-    all_streams = []
-    for i in range(len(convo)):
-        messages = [HumanMessage(content=convo[i])]
-        result_stream = react_graph.stream({"messages": messages})
-        all_streams.append(result_stream)
-    return all_streams
 
-get_agent_response(["What is the price of copper?", "What is the price of gold?"])
+# METHOD 1: Using the TracedAgent wrapper
+# ----------------------
 
-# log_lang_stream(["What is the price of copper?", "What is the price of gold?"])
+# Create a traced version of the agent
+traced_graph = create_traced_agent(react_graph)
+
+def get_agent_response_wrapped(queries):
+    """Use the TracedAgent wrapper to automatically trace all interactions"""
+    results = []
+    for query in queries:
+        # Create the message format expected by the agent
+        messages = [HumanMessage(content=query)]
+        
+        # Use the traced agent (stream or invoke both work)
+        result = traced_graph.stream({"messages": messages})
+        
+        # Store the result for return (optional)
+        results.append(list(result))  # Consume the generator
+    
+    # Log all the traces
+    log_path = log_traces()
+    print(f"Traces saved to: {log_path}")
+    
+    return results
+
+# Example usage
+get_agent_response_wrapped(["What is the price of copper?", "What is the price of gold?"])
+
+
+# METHOD 2: Using the TraceContext
+# ----------------------
+
+# def get_agent_response_context(queries):
+#     """Use context managers to explicitly trace each conversation"""
+#     results = []
+    
+#     for query in queries:
+#         # Create a trace context for this query
+#         with TraceContext(query) as ctx:
+#             # Build the message format from the context
+#             messages = [HumanMessage(content=query)]
+            
+#             # Use the original agent
+#             result = react_graph.stream({"messages": messages})
+            
+#             # Process and store the result
+#             collected_steps = list(result)  # Consume the generator
+#             results.append(collected_steps)
+    
+#     # Log all the traces
+#     log_path = log_traces()
+#     print(f"Traces saved to: {log_path}")
+    
+#     return results
+
+# # Example usage
+# get_agent_response_context(["What is the price of platinum?", "What is the price of silver?"])
+
+
+# METHOD 3: Backwards compatibility with decorators
+# ----------------------
+
+# from src.langgraph.trace_improved import trace_call
+
+# @trace_call
+# def get_agent_response_decorator(query):
+#     """Use decorator approach for simpler functions"""
+#     messages = [HumanMessage(content=query)]
+#     return list(react_graph.stream({"messages": messages}))
+
+# # Example usage - call once per query
+# get_agent_response_decorator("What is the price of palladium?")
+# get_agent_response_decorator("What is the price of aluminum?")
+
+# # Log the traced results
+# log_path = log_traces()
+# print(f"Traces saved to: {log_path}")
+
+
 
 from src.data.dataset import EvalDataset
 from src.controller.options import ExperimentOptions
@@ -161,11 +229,11 @@ gt_dataset = EvalDataset(
 )
 
 experiment_options = ExperimentOptions(
-    experiment_id="new_test",
+    experiment_id="improved_test",
     langgraph=True
 )
 
 experiment = Experiment(dataset=gt_dataset, options=experiment_options)
 
 # # Try loading the experiment to couchbase
-# experiment.load_to_couchbase(collection="langgraph_test")
+# experiment.load_to_couchbase(collection="langgraph_test") 

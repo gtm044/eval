@@ -11,6 +11,8 @@ input_data/
 *.json
 *.csv
 chroma_db/
+junk_json/
+toy_results/
 
 # Cursor
 .cursor/

@@ -141,24 +141,36 @@ class ValidationEngine:
         # Convert to pandas DataFrame if results is not of type dataframe
         df = results.to_pandas() if not isinstance(results, pd.DataFrame) else results
         
-        if self.dataset.answers is not None:
-            df["ground_truth_answer"] = self.dataset.answers
+        additional_fields = {
+            "ground_truth_answer": self.dataset.answers,
+            "avg_chunk_size": avg_chunk_size_result,
+            "context_similarity": context_similarity_result,
+            "context_score": context_score_result,
+            "llm_grading": llm_grading_result
+        }
         
-        # Add the avg chunk size result to the results
-        if avg_chunk_size_result is not None:
-            df["avg_chunk_size"] = avg_chunk_size_result
+        for item, value in additional_fields.items():
+            if value is not None:
+                df[item] = value
         
-        # Add the context similarity result to the results
-        if context_similarity_result is not None:
-            df["context_similarity"] = context_similarity_result
+        # if self.dataset.answers is not None:
+        #     df["ground_truth_answer"] = self.dataset.answers
         
-        # Add the context score result to the results
-        if context_score_result is not None:
-            df["context_score"] = context_score_result
+        # # Add the avg chunk size result to the results
+        # if avg_chunk_size_result is not None:
+        #     df["avg_chunk_size"] = avg_chunk_size_result
+        
+        # # Add the context similarity result to the results
+        # if context_similarity_result is not None:
+        #     df["context_similarity"] = context_similarity_result
+        
+        # # Add the context score result to the results
+        # if context_score_result is not None:
+        #     df["context_score"] = context_score_result
             
-        # Add the llm grading result to the results
-        if llm_grading_result is not None:
-            df["llm_grading"] = llm_grading_result
+        # # Add the llm grading result to the results
+        # if llm_grading_result is not None:
+        #     df["llm_grading"] = llm_grading_result
             
         # Create results directory if it doesn't exist
         results_dir = ".results"
@@ -205,7 +217,6 @@ class ValidationEngine:
             return results_dict, self.metrics, json_schema, avg_metrics
         else:
             return results_dict, applicable_metrics, json_schema, avg_metrics
-        
         
 if __name__=='__main__':
     # Example usage of ValidationEngine

@@ -1,11 +1,17 @@
 import numpy as np
 import os
-from src.utils.nlp import rouge_n, rouge_l, cosine_similarity
+from src.utils.nlp import rouge_n, rouge_l, cosine_similarity, ner
 from src.utils.models import openai_embedding
 from nltk.translate.bleu_score import sentence_bleu
 from keybert import KeyBERT
 from typing import List, Optional
 from openai import OpenAI
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+import nltk
+from nltk.tokenize import sent_tokenize
+import json
+import re
 
 def rouge_score(answers, responses):
     """
@@ -30,24 +36,6 @@ def bleu_score(answers, responses):
         score = sentence_bleu([reference], retrieved)
         scores.append(round(score, 2))
     return scores
-
-def faithfulness(retrieved_contexts, responses):
-    """
-    Calculates the overlap keywords between the retrieved contexts and the llm responses.
-    """
-    model = KeyBERT('distilbert-base-nli-mean-tokens')
-    scores = []
-    for _context, _responses in zip(retrieved_contexts, responses):
-        c_keywords = model.extract_keywords(_context)
-        r_keywords = model.extract_keywords(_responses)
-        # output is a list of tuples (keyword, score), extract the keywords
-        c_keywords = [keyword for keyword, score in c_keywords]
-        r_keywords = [keyword for keyword, score in r_keywords]
-        # Calculate the overlap
-        overlap = len(set(c_keywords).intersection(set(r_keywords)))
-        faithfulness_score = round((overlap / len(c_keywords)) * 100, 2)
-        scores.append(faithfulness_score)
-    return scores 
 
 def response_similarity(answers, responses, method="cosine"):
     """
@@ -114,6 +102,202 @@ def llm_grading(queries: List[str], ground_truths: List[str], model_answers: Lis
     return grades
 
 
+def hybrid_faithfulness(retrieved_contexts, responses):
+    """
+    A hybrid approach to faithfulness combining sentence embeddings, entity extraction,
+    and numeric fact checking. Penalizes contradicting information, not additional content.
+    
+    Args:
+        retrieved_contexts (List[str]): List of reference contexts
+        responses (List[str]): List of LLM-generated responses
+        
+    Returns:
+        List[float]: Faithfulness scores between 0 and 1
+    """
+    scores = []
+    
+    for context, response in zip(retrieved_contexts, responses):
+        if not context or not response:
+            scores.append(0.0)
+            continue
+            
+        try:
+            context_sentences = sent_tokenize(context)
+            response_sentences = sent_tokenize(response)
+        except:
+            nltk.download('punkt')
+            context_sentences = sent_tokenize(context)
+            response_sentences = sent_tokenize(response)
+            
+        if not response_sentences:
+            scores.append(0.0)
+            continue
+            
+        context_embeddings = [openai_embedding(sent) for sent in context_sentences]
+        response_embeddings = [openai_embedding(sent) for sent in response_sentences]
+        
+        similarity_scores = []
+        for ctx_emb in context_embeddings:
+            similarities = [cosine_similarity(ctx_emb, resp_emb) for resp_emb in response_embeddings]
+            max_similarity = max(similarities) if similarities else 0
+            similarity_scores.append(max_similarity)
+            
+        avg_similarity_score = sum(similarity_scores) / len(similarity_scores) if similarity_scores else 0
+        
+        context_entities = ner(context)
+        response_entities = ner(response)
+        
+        context_entity_types = {entity_type for _, entity_type in context_entities}
+        relevant_response_entities = {(entity, entity_type) for entity, entity_type in response_entities 
+                                     if entity_type in context_entity_types}
+        
+        contradicting_entities = 0
+        if relevant_response_entities:
+            for resp_entity, resp_type in relevant_response_entities:
+                similar_context_entities = {entity for entity, entity_type in context_entities if entity_type == resp_type}
+                
+                if similar_context_entities and resp_entity not in [entity for entity, entity_type in context_entities]:
+                    has_similar = False
+                    for ctx_entity in similar_context_entities:
+                        if (resp_entity in ctx_entity or ctx_entity in resp_entity or
+                            cosine_similarity(openai_embedding(resp_entity), openai_embedding(ctx_entity)) > 0.85):
+                            has_similar = True
+                            break
+                    
+                    if not has_similar:
+                        contradicting_entities += 1
+            
+            entity_score = 1.0 - (contradicting_entities / len(relevant_response_entities))
+        else:
+            entity_score = 1.0
+            
+        context_numbers = set(re.findall(r'\b\d+(?:\.\d+)?\b', context))
+        response_numbers = set(re.findall(r'\b\d+(?:\.\d+)?\b', response))
+        
+        numeric_score = 1.0
+        if context_numbers and response_numbers:
+            numeric_score = 0.9
+        
+        final_score = (0.7 * avg_similarity_score) + (0.2 * entity_score) + (0.1 * numeric_score)
+        scores.append(round(final_score, 3))
+        
+    return scores
+
+def contradiction_faithfulness(retrieved_contexts, responses):
+    """
+    A specialized faithfulness metric focused on detecting contradictions rather than
+    penalizing additional information. Based on the paper "SUMMAC: Re-Visiting NLI-based
+    Models for Inconsistency Detection in Summarization" (Laban et al., 2022).
+    
+    This approach only penalizes statements that actively contradict the reference context,
+    allowing responses to include additional information freely as long as it doesn't
+    conflict with the provided context.
+    
+    Args:
+        retrieved_contexts (List[str]): List of reference contexts
+        responses (List[str]): List of LLM-generated responses
+        
+    Returns:
+        List[float]: Faithfulness scores between 0 and 1, where 1 means no contradictions
+    """
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    scores = []
+    
+    for context, response in zip(retrieved_contexts, responses):
+        # Skip empty pairs
+        if not context or not response:
+            scores.append(1.0)  # No contradictions possible with empty input
+            continue
+            
+        # Break response into sentences
+        try:
+            response_sentences = sent_tokenize(response)
+        except:
+            nltk.download('punkt')
+            response_sentences = sent_tokenize(response)
+            
+        if not response_sentences:
+            scores.append(1.0)  # No contradictions with empty response
+            continue
+            
+        # Only check sentences that are likely to contain factual claims
+        # Filter out very short sentences and questions
+        factual_sentences = [s for s in response_sentences 
+                           if len(s.split()) >= 4 and not s.endswith('?')]
+        
+        if not factual_sentences:
+            scores.append(1.0)  # No substantive claims to check
+            continue
+        
+        # Build prompt focused on finding contradictions
+        prompt = """You are evaluating whether statements from an AI response CONTRADICT information in a reference context.
+        Your ONLY job is to identify direct contradictions - statements that directly oppose facts stated in the reference.
+
+        Reference Context:
+        ```
+        {context}
+        ```
+
+        Response statements to check:
+        {statements}
+
+        For each statement, determine if it CONTRADICTS the reference context.
+        - Label as "CONTRADICTION" only if the statement directly opposes a fact in the reference.
+        - Label as "NO_CONTRADICTION" if the statement is supported by or simply not mentioned in the reference.
+
+        IMPORTANT: Additional information not found in the reference is fine as long as it doesn't contradict it.
+        Only flag direct factual contradictions, not opinions, style differences, or added details.
+
+        Format your response as a JSON object with a "labels" key containing an array of the labels, like this:
+        {{"labels": ["NO_CONTRADICTION", "CONTRADICTION", ...]}}
+        """
+        
+        # Process sentences in batches for efficiency
+        batch_size = 5
+        contradiction_count = 0
+        total_sentences = len(factual_sentences)
+        
+        for i in range(0, total_sentences, batch_size):
+            batch = factual_sentences[i:i+batch_size]
+            
+            # Format statements for the prompt
+            statements_text = "\n".join([f"{j+1}. {s}" for j, s in enumerate(batch)])
+            
+            # Send request to check for contradictions
+            messages = [{"role": "user", "content": prompt.format(context=context, statements=statements_text)}]
+            
+            try:
+                response_eval = client.chat.completions.create(
+                    model="gpt-4o-mini",  # Use a smaller, faster model for efficiency
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    temperature=0.0
+                )
+                
+                # Parse the response
+                result = response_eval.choices[0].message.content
+                labels = json.loads(result).get("labels", [])
+                
+                # Count contradictions
+                contradiction_count += labels.count("CONTRADICTION")
+                
+            except Exception as e:
+                print(f"Error checking contradictions: {e}")
+                # Neutral stance on error
+                contradiction_count += 0
+        
+        # Calculate faithfulness score based on absence of contradictions
+        # 1.0 means no contradictions, lower scores indicate more contradictions
+        if total_sentences > 0:
+            # Calculate proportion of non-contradicting sentences
+            faithfulness_score = 1.0 - (contradiction_count / total_sentences)
+            scores.append(round(faithfulness_score, 3))
+        else:
+            scores.append(1.0)  # No sentences to check
+            
+    return scores
+
 llm_grading.name = "llm_grading"
 
 
@@ -160,5 +344,14 @@ if __name__ == '__main__':
         "Evaluate based on structural accuracy (nucleotides, base pairs, double helix), functional explanation (genetic code, protein synthesis), and clarity of the relationship between structure and function.",
         "Grade based on balanced coverage of both potential benefits and drawbacks, economic theory application, consideration of implementation challenges, and discussion of real-world examples or pilot programs."
     ]
-    print(llm_grading(queries, ground_truths, model_answers, rubrics))
+    # print(llm_grading(queries, ground_truths, model_answers, rubrics))
     
+    reference = """"[{\"airbnb\": {\"Construction year\": 2019, \"NAME\": \"Only 2 stops to Manhattan studio\", \"availability 365\": 188.0, \"calculated host listings count\": 1, \"cancellation_policy\": \"moderate\", \"country\": \"United States\", \"country code\": \"US\", \"host id\": 80873428617, \"host name\": \"Allen & Irina\", \"host_identity_verified\": \"unconfirmed\", \"house_rules\": \"\", \"id\": \"30093739\", \"instant_bookable\": false, \"last review\": \"2022-02-20 00:00:00\", \"lat\": 40.70935, \"license\": \"\", \"long\": -73.95342, \"minimum nights\": 30, \"neighbourhood\": \"Williamsburg\", \"neighbourhood group\": \"Brooklyn\", \"number of reviews\": 184, \"price\": 468, \"review rate number\": 5, \"reviews per month\": 1.18, \"room type\": \"Entire home/apt\", \"service fee\": 94}}"
+    """
+
+    model_answer = """
+    The construction year for Only 2 stops to manhattan studio is 2021. It is located in the neighborhood of brooklyn
+    """
+    
+    print(hybrid_faithfulness(retrieved_contexts=[reference], responses=[model_answer]))
+    print(contradiction_faithfulness(retrieved_contexts=[reference], responses=[model_answer]))

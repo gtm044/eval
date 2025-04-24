@@ -10,7 +10,7 @@ from src.data.dataset import EvalDataset
 from couchbase.kv_range_scan import PrefixScan
 from src.evaluator.validation import ValidationEngine
 from src.evaluator.validate_agent import AgentValidationEngine
-from src.langgraph.trace import get_langgraph_logs
+from src.langgraph.trace import get_langgraph_logs, log_lang_stream
 
 class Experiment:
     def __init__(self, dataset: Optional[EvalDataset] = None, options: Optional[ExperimentOptions] = None):
@@ -48,6 +48,7 @@ class Experiment:
             
         # If the langgraph option is set to true, then call another function to evaluate the langgraph logs (not implemented yet)
         if self.options.langgraph:
+            # log_lang_stream()
             logs = get_langgraph_logs()
             engine = AgentValidationEngine(langgraph_logs=logs, reference_tool_calls=self.dataset.reference_tool_calls, gt_answers=self.dataset.gt_answers, gt_tool_outputs=self.dataset.gt_tool_outputs)
             self.output, self.metrics, self.avg_metrics = engine.evaluate()

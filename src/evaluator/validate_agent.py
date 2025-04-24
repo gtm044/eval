@@ -140,7 +140,7 @@ class AgentValidationEngine:
             else:
                 avg_metrics[metric] = None
                 
-        # Create a results directory
+        # Create a results directory.
         results_dir = ".results"
         os.makedirs(results_dir, exist_ok=True)
         
@@ -199,3 +199,6 @@ if __name__ == "__main__":
         print("Error: Could not find langgraph logs file")
     except json.JSONDecodeError:
         print("Error: Could not parse langgraph logs file")
+        
+    # As of now, we can run the decorator on the agentic function and get the logs -> evaluation
+    # But the question is what happens if the function has a different signature?

@@ -51,7 +51,7 @@ def rouge_n(candidate, reference, n=3):
     """
     # Generate n-grams for both candidate and reference texts
     ngrams_A, ngrams_B = n_gram(candidate.split(), n), n_gram(reference.split(), n)
-    # Count overlapping n-grams
+    # Overlapping n-grams
     overlaps = len(set(ngrams_A).intersection(set(ngrams_B)))
     # Calculate recall: overlaps / total reference n-grams
     recall = overlaps / len(ngrams_B) if len(ngrams_B) > 0 else 0

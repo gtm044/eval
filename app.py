@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import pandas as pd
 import json
+import time
 from dotenv import load_dotenv
 from src.data.dataset import EvalDataset
 from src.data.generator import SyntheticDataGenerator
@@ -116,6 +117,58 @@ if option == "Generate Data":
         
         limit = st.number_input("Limit number of rows to process (optional)", min_value=1, max_value=100, value=10)
         
+        # Add customization options in expanders
+        with st.expander("Question Generation Options", expanded=False):
+            q_custom_instructions = st.text_area(
+                "Custom instructions for question generation",
+                placeholder="Enter custom instructions to override the default question generation behavior"
+            )
+            
+            example_questions_text = st.text_area(
+                "Example document-question pairs",
+                placeholder="What is the capital of France?\nHow tall is the Eiffel Tower?\nWhen was the Declaration of Independence signed?"
+            )
+            
+            example_questions = [q.strip() for q in example_questions_text.split('\n') if q.strip()] if example_questions_text else None
+        
+        with st.expander("Answer Generation Options", expanded=False):
+            answer_style = st.text_area(
+                "Answer style instructions",
+                placeholder="E.g., 'Use a conversational tone with simple language'"
+            )
+            
+            answer_format = st.text_area(
+                "Answer format instructions",
+                placeholder="E.g., 'Structure answers as bullet points'"
+            )
+            
+            tone = st.text_input(
+                "Tone for answers",
+                placeholder="E.g., 'professional', 'casual', 'academic'"
+            )
+            
+            max_length = st.number_input(
+                "Maximum answer length (words)", 
+                min_value=10, 
+                value=None,
+                help="Maximum word count for each answer"
+            )
+            
+            # include_citations = st.checkbox(
+            #     "Include citations",
+            #     help="Whether to include citations to specific parts of the document"
+            # )
+            
+            additional_instructions = st.text_area(
+                "Additional instructions",
+                placeholder="Any additional instructions for answer generation"
+            )
+            
+            # a_custom_instructions = st.text_area(
+            #     "Custom instructions for answer generation",
+            #     placeholder="Enter custom instructions to override the default answer generation behavior"
+            # )
+        
         if uploaded_file is not None:
             if st.button("Generate Data", key="generate_csv_json"):
                 try:
@@ -131,6 +184,7 @@ if option == "Generate Data":
                     generator = SyntheticDataGenerator()
                     
                     with st.spinner("Generating synthetic data..."):
+                        start_time = time.time()
                         if file_format == "csv":
                             df = pd.read_csv("temp_upload.csv")
                             df = df[:limit]
@@ -138,7 +192,18 @@ if option == "Generate Data":
                             df.to_csv(temp_path, index=False)   
                             generated_data = generator.synthesize_from_csv(
                                 path=temp_path,
-                                metadata=metadata
+                                metadata=metadata,
+                                # Question generation parameters
+                                question_custom_instructions=q_custom_instructions if q_custom_instructions else None,
+                                example_questions=example_questions,
+                                # Answer generation parameters
+                                answer_style=answer_style if answer_style else None,
+                                answer_format=answer_format if answer_format else None,
+                                tone=tone if tone else None,
+                                max_length=max_length,
+                                # include_citations=include_citations,
+                                additional_instructions=additional_instructions if additional_instructions else None,
+                                # answer_custom_instructions=a_custom_instructions if a_custom_instructions else None
                             )
                             os.remove(temp_path)
                         else:  # json
@@ -151,8 +216,20 @@ if option == "Generate Data":
                             documents = documents[:limit]
                             generated_data = generator.synthesize(
                                 documents=documents,
-                                metadata=metadata
+                                metadata=metadata,
+                                # Question generation parameters
+                                question_custom_instructions=q_custom_instructions if q_custom_instructions else None,
+                                example_questions=example_questions,
+                                # Answer generation parameters
+                                answer_style=answer_style if answer_style else None,
+                                answer_format=answer_format if answer_format else None,
+                                tone=tone if tone else None,
+                                max_length=max_length,
+                                # include_citations=include_citations,
+                                additional_instructions=additional_instructions if additional_instructions else None,
+                                # answer_custom_instructions=a_custom_instructions if a_custom_instructions else None
                             )
+                        generation_time = time.time() - start_time
                     
                     # Store generated data in session state
                     st.session_state.data_generation_completed = True
@@ -168,7 +245,7 @@ if option == "Generate Data":
                     
                     # Save to JSON for download
                     with open("generated_dataset.json", "w") as f:
-                        json.dump(st.session_state.generated_dataset, f)
+                        json.dump(st.session_state.generated_dataset, f, indent=4)
                     
                     # Clean up
                     os.remove(f"temp_upload.{file_format}")
@@ -183,6 +260,10 @@ if option == "Generate Data":
             
             # Display success message
             st.success(f"Successfully generated {len(generated_data['questions'])} question-answer pairs!")
+            
+            # Display generation time if available
+            if 'generation_time' in locals():
+                st.info(f"Generation completed in {generation_time:.2f} seconds")
             
             # Create DataFrame for display
             data_for_display = []
@@ -215,6 +296,67 @@ if option == "Generate Data":
                                 placeholder="E.g., 'Documents are technical articles about machine learning.'",
                                 key="raw_text_metadata")
         
+        # Add customization options in expanders
+        with st.expander("Question Generation Options", expanded=False):
+            q_custom_instructions_raw = st.text_area(
+                "Custom instructions for question generation",
+                placeholder="Enter custom instructions to override the default question generation behavior",
+                key="q_custom_instructions_raw"
+            )
+            
+            example_questions_text_raw = st.text_area(
+                "Example document-question pairs",
+                placeholder="What is the capital of France?\nHow tall is the Eiffel Tower?\nWhen was the Declaration of Independence signed?",
+                key="example_questions_text_raw"
+            )
+            
+            example_questions_raw = [q.strip() for q in example_questions_text_raw.split('\n') if q.strip()] if example_questions_text_raw else None
+        
+        with st.expander("Answer Generation Options", expanded=False):
+            answer_style_raw = st.text_area(
+                "Answer style instructions",
+                placeholder="E.g., 'Use a conversational tone with simple language'",
+                key="answer_style_raw"
+            )
+            
+            answer_format_raw = st.text_area(
+                "Answer format instructions",
+                placeholder="E.g., 'Structure answers as bullet points'",
+                key="answer_format_raw"
+            )
+            
+            tone_raw = st.text_input(
+                "Tone for answers",
+                placeholder="E.g., 'professional', 'casual', 'academic'",
+                key="tone_raw"
+            )
+            
+            max_length_raw = st.number_input(
+                "Maximum answer length (words)", 
+                min_value=10, 
+                value=None,
+                help="Maximum word count for each answer",
+                key="max_length_raw"
+            )
+            
+            include_citations_raw = st.checkbox(
+                "Include citations",
+                help="Whether to include citations to specific parts of the document",
+                key="include_citations_raw"
+            )
+            
+            additional_instructions_raw = st.text_area(
+                "Additional instructions",
+                placeholder="Any additional instructions for answer generation",
+                key="additional_instructions_raw"
+            )
+            
+            a_custom_instructions_raw = st.text_area(
+                "Custom instructions for answer generation",
+                placeholder="Enter custom instructions to override the default answer generation behavior",
+                key="a_custom_instructions_raw"
+            )
+        
         if st.button("Generate Data", key="generate_raw_text") and raw_text:
             try:
                 # Parse input into documents
@@ -224,10 +366,23 @@ if option == "Generate Data":
                 generator = SyntheticDataGenerator()
                 
                 with st.spinner("Generating synthetic data..."):
+                    start_time = time.time()
                     generated_data = generator.synthesize(
                         documents=documents,
-                        metadata=metadata
+                        metadata=metadata,
+                        # Question generation parameters
+                        question_custom_instructions=q_custom_instructions_raw if q_custom_instructions_raw else None,
+                        example_questions=example_questions_raw,
+                        # Answer generation parameters
+                        answer_style=answer_style_raw if answer_style_raw else None,
+                        answer_format=answer_format_raw if answer_format_raw else None,
+                        tone=tone_raw if tone_raw else None,
+                        max_length=max_length_raw,
+                        include_citations=include_citations_raw,
+                        additional_instructions=additional_instructions_raw if additional_instructions_raw else None,
+                        answer_custom_instructions=a_custom_instructions_raw if a_custom_instructions_raw else None
                     )
+                    generation_time = time.time() - start_time
                 
                 # Store generated data in session state
                 st.session_state.data_generation_completed = True
@@ -242,7 +397,7 @@ if option == "Generate Data":
                                     
                 # Save to JSON for download
                 with open("generated_dataset.json", "w") as f:
-                    json.dump(st.session_state.generated_dataset, f)
+                    json.dump(st.session_state.generated_dataset, f, indent=4)
                 
             except Exception as e:
                 st.error(f"Error generating data: {str(e)}")
@@ -253,6 +408,10 @@ if option == "Generate Data":
             
             # Display success message
             st.success(f"Successfully generated {len(generated_data['questions'])} question-answer pairs!")
+            
+            # Display generation time if available
+            if 'generation_time' in locals():
+                st.info(f"Generation completed in {generation_time:.2f} seconds")
             
             # Create DataFrame for display
             data_for_display = []
@@ -344,7 +503,7 @@ elif option == "Evaluate":
                     st.error(f"Error loading dataset: {str(e)}")
         
         with dataset_source_tab2:
-            st.write("Load dataset from Couchbase: Try sample dataset id: d37a7fc1-a59d-4a06-91f5-852e58ea9fb7")
+            st.write("Load dataset from Couchbase: Try sample dataset id: 3aa57d61-c2b4-4a3a-8939-f7bdef078eb2")
             
             # Check if Couchbase credentials are available
             if (os.environ.get("cluster_url") and 
@@ -361,11 +520,16 @@ elif option == "Evaluate":
                     try:
                         with st.spinner("Loading dataset from Couchbase..."):
                             # Initialize dataset with load operator
+                            start_time = time.time()
                             dataset = LoadOperator().retrieve_docs(dataset_id=dataset_id)
+                            load_time = time.time() - start_time
                             
                             # Store in session state
                             st.session_state.evaluation_dataset_loaded = True
                             st.session_state.evaluation_dataset = dataset
+                            
+                            # Display loading time
+                            st.info(f"Dataset loaded in {load_time:.2f} seconds")
                             
                     except Exception as e:
                         st.error(f"Error loading dataset from Couchbase: {str(e)}")
@@ -408,17 +572,17 @@ elif option == "Evaluate":
             col1, col2 = st.columns(2)
             
             with col1:
-                use_faithfulness = st.checkbox("Faithfulness", value=True)
-                use_answer_relevancy = st.checkbox("Answer Relevancy", value=True)
-                use_context_recall = st.checkbox("Context Recall", value=True)
-                use_context_precision = st.checkbox("Context Precision", value=True)
-                use_llm_grading = st.checkbox("LLM Grading", value=True)
+                use_faithfulness = st.checkbox("Faithfulness", value=False)
+                use_answer_relevancy = st.checkbox("Answer Relevancy", value=False)
+                use_context_recall = st.checkbox("Context Recall", value=False)
+                use_context_precision = st.checkbox("Context Precision", value=False)
+                use_llm_grading = st.checkbox("LLM Grading", value=False)
             
             with col2:
-                use_answer_correctness = st.checkbox("Answer Correctness", value=True)
-                use_avg_chunk_size = st.checkbox("Average Chunk Size", value=True)
-                use_context_similarity = st.checkbox("Context Similarity", value=True)
-                use_context_score = st.checkbox("Context Score", value=True)
+                use_answer_correctness = st.checkbox("Answer Correctness", value=False)
+                use_avg_chunk_size = st.checkbox("Average Chunk Size", value=False)
+                use_context_similarity = st.checkbox("Context Similarity", value=False)
+                use_context_score = st.checkbox("Context Score", value=False)
             
             if st.button("Run Evaluation", key="run_evaluation"):
                 # Prepare metrics list
@@ -435,14 +599,19 @@ elif option == "Evaluate":
                 
                 with st.spinner("Running evaluation..."):
                     # Run evaluation
+                    start_time = time.time()
                     engine = ValidationEngine(dataset=dataset, metrics=metrics)
                     results, metrics_objs, schema, avg_metrics = engine.evaluate()
+                    evaluation_time = time.time() - start_time
                 
                 # Store results in session state
                 st.session_state.evaluation_results_loaded = True
                 st.session_state.evaluation_results = results
                 st.session_state.evaluation_avg_metrics = avg_metrics
                 st.session_state.evaluation_metrics_objs = metrics_objs
+                
+                # Display evaluation time
+                st.info(f"Evaluation completed in {evaluation_time:.2f} seconds")
         
         # Display results if available
         if st.session_state.evaluation_results_loaded:
@@ -523,11 +692,14 @@ elif option == "Experiment":
                             load_op = LoadOperator()
                             
                             # Load dataset from Couchbase
+                            start_time = time.time()
                             dataset = load_op.retrieve_docs(dataset_id=dataset_id)
+                            load_time = time.time() - start_time
                             
                             if dataset:
                                 st.session_state.experiment_dataset = dataset
                                 st.success(f"Successfully loaded dataset with ID: {dataset_id}")
+                                st.info(f"Dataset loaded in {load_time:.2f} seconds")
                                 dataset_loaded = True
                             else:
                                 st.error(f"No data found for dataset ID: {dataset_id}")
@@ -561,17 +733,17 @@ elif option == "Experiment":
         col1, col2 = st.columns(2)
         
         with col1:
-            use_faithfulness = st.checkbox("Faithfulness", value=True, key="exp_faith")
-            use_answer_relevancy = st.checkbox("Answer Relevancy", value=True, key="exp_ans_rel")
-            use_context_recall = st.checkbox("Context Recall", value=True, key="exp_ctx_recall")
-            use_context_precision = st.checkbox("Context Precision", value=True, key="exp_ctx_prec")
-            use_llm_grading = st.checkbox("LLM Grading", value=True, key="exp_llm_grading")
+            use_faithfulness = st.checkbox("Faithfulness", value=False, key="exp_faith")
+            use_answer_relevancy = st.checkbox("Answer Relevancy", value=False, key="exp_ans_rel")
+            use_context_recall = st.checkbox("Context Recall", value=False, key="exp_ctx_recall")
+            use_context_precision = st.checkbox("Context Precision", value=False, key="exp_ctx_prec")
+            use_llm_grading = st.checkbox("LLM Grading", value=False, key="exp_llm_grading")
         
         with col2:
-            use_answer_correctness = st.checkbox("Answer Correctness", value=True, key="exp_ans_corr")
-            use_avg_chunk_size = st.checkbox("Average Chunk Size", value=True, key="exp_chunk_size")
-            use_context_similarity = st.checkbox("Context Similarity", value=True, key="exp_ctx_sim")
-            use_context_score = st.checkbox("Context Score", value=True, key="exp_ctx_score")
+            use_answer_correctness = st.checkbox("Answer Correctness", value=False, key="exp_ans_corr")
+            use_avg_chunk_size = st.checkbox("Average Chunk Size", value=False, key="exp_chunk_size")
+            use_context_similarity = st.checkbox("Context Similarity", value=False, key="exp_ctx_sim")
+            use_context_score = st.checkbox("Context Score", value=False, key="exp_ctx_score")
         
         create_experiment_button = st.button("Create Experiment", key="create_experiment", disabled=not dataset_loaded)
         
@@ -621,9 +793,14 @@ elif option == "Experiment":
                 
                 with st.spinner("Running experiment..."):
                     # Initialize experiment
+                    start_time = time.time()
                     experiment = Experiment(dataset=dataset, options=options)
+                    experiment_time = time.time() - start_time
                 
                 st.session_state.experiment_results_loaded = True
+                
+                # Display experiment time
+                st.info(f"Experiment completed in {experiment_time:.2f} seconds")
                 
                 # Load and store results in session state
                 results_file = f".results-{experiment_id}/results.json"
@@ -780,12 +957,6 @@ elif option == "Experiment":
                 # Display results table
                 st.subheader("Detailed Results")
                 st.dataframe(df)
-                
-                # Visualize metrics
-                st.subheader("Metrics Visualization")
-                for metric in numeric_columns:
-                    fig = px.histogram(df, x=metric, title=f"Distribution of {metric}")
-                    st.plotly_chart(fig)
                 
                 # Offer download of results
                 experiment_dir = f".results-{experiment_id}"
