@@ -14,12 +14,21 @@ from src.utils.prompts import (
     render_synthetic_valid_answer_prompt,
     render_expand_documents_prompt
 )
+from src.data.generator_v2 import DataGenerator
 
 load_dotenv()
 
 # Problem: 
 # Sometime really slow
 # Can we speed up the generation using multithreading since py3.13 has an optional GIL?
+
+def init_generator(type="single-hop"):
+    if type == "single-hop":
+        return SyntheticDataGenerator()
+    elif type == "multi-hop":
+        return DataGenerator()
+    else:
+        raise ValueError(f"Invalid generator type: {type}. Options: single-hop, multi-hop")
 
 class SyntheticDataGenerator:
     def __init__(self):
@@ -151,7 +160,7 @@ class SyntheticDataGenerator:
             
         return answers
     
-    def synthesize(self, documents: List[str], metadata=None, expand=False,
+    def synthesize_from_text(self, documents: List[str], metadata=None, expand=False,
                   # Question generation parameters
                   question_custom_instructions: str = None, 
                   example_questions: List[str] = None,
@@ -248,7 +257,7 @@ class SyntheticDataGenerator:
         # Delete the json file
         os.remove("data.json")
         
-        return self.synthesize(
+        return self.synthesize_from_text(
             documents, 
             metadata,
             question_custom_instructions=question_custom_instructions,
@@ -261,7 +270,51 @@ class SyntheticDataGenerator:
             additional_instructions=additional_instructions,
             answer_custom_instructions=answer_custom_instructions
         )
+    
+    def synthesize_from_json(self, path: str, field: str = None, metadata: str = None,
+                           # Question generation parameters
+                           question_custom_instructions: str = None, 
+                           example_questions: List[str] = None,
+                           # Answer generation parameters
+                           answer_style: str = None, 
+                           answer_format: str = None,
+                           tone: str = None, 
+                           max_length: int = None,
+                           include_citations: bool = False, 
+                           additional_instructions: str = None,
+                           answer_custom_instructions: str = None):
+        """
+        Synthesize questions and answers directly from a JSON file or directory.
         
+        Args:
+            path: Path to the JSON file or directory containing JSON files
+            field: Field name in the JSON object containing the raw documents
+            metadata: Optional metadata about the documents
+            question_custom_instructions: Custom instructions for question generation
+            example_questions: Example questions for question generation
+            answer_style: Style instructions for the answers
+            answer_format: Format instructions for the answers
+            tone: Tone for the answers
+            max_length: Maximum length for answers
+            include_citations: Whether to include citations
+            additional_instructions: Additional instructions for answer generation
+            answer_custom_instructions: Custom instructions for answer generation
+        """
+        documents = self.load_from_json(path, field)
+        
+        return self.synthesize_from_text(
+            documents, 
+            metadata,
+            question_custom_instructions=question_custom_instructions,
+            example_questions=example_questions,
+            answer_style=answer_style,
+            answer_format=answer_format,
+            tone=tone,
+            max_length=max_length,
+            include_citations=include_citations,
+            additional_instructions=additional_instructions,
+            answer_custom_instructions=answer_custom_instructions
+        )
         
     def load_from_json(self, path: str, field: str = None):
         """
@@ -378,22 +431,43 @@ if __name__ == "__main__":
                 answer_custom_instructions=args.answer_instructions
             )
     else:  # json
-        documents = generator.load_from_json(path=args.path, field=args.field)
         if args.limit:
+            # Load documents and limit them
+            documents = generator.load_from_json(path=args.path, field=args.field)
             documents = documents[:args.limit]
-        generated_data = generator.synthesize(
-            documents=documents, 
-            metadata=metadata,
-            question_custom_instructions=args.question_instructions,
-            example_questions=example_questions,
-            answer_style=args.answer_style,
-            answer_format=args.answer_format,
-            tone=args.tone,
-            max_length=args.max_length,
-            include_citations=args.include_citations,
-            additional_instructions=args.additional_instructions,
-            answer_custom_instructions=args.answer_instructions
-        )
+            # Create temporary JSON file with limited documents
+            temp_path = "temp_limited_data.json"
+            with open(temp_path, 'w') as f:
+                json.dump(documents, f)
+            generated_data = generator.synthesize_from_json(
+                path=temp_path,
+                metadata=metadata,
+                question_custom_instructions=args.question_instructions,
+                example_questions=example_questions,
+                answer_style=args.answer_style,
+                answer_format=args.answer_format,
+                tone=args.tone,
+                max_length=args.max_length,
+                include_citations=args.include_citations,
+                additional_instructions=args.additional_instructions,
+                answer_custom_instructions=args.answer_instructions
+            )
+            os.remove(temp_path)
+        else:
+            generated_data = generator.synthesize_from_json(
+                path=args.path,
+                field=args.field,
+                metadata=metadata,
+                question_custom_instructions=args.question_instructions,
+                example_questions=example_questions,
+                answer_style=args.answer_style,
+                answer_format=args.answer_format,
+                tone=args.tone,
+                max_length=args.max_length,
+                include_citations=args.include_citations,
+                additional_instructions=args.additional_instructions,
+                answer_custom_instructions=args.answer_instructions
+            )
     
     # End measuring time and memory
     end_time = time.time()

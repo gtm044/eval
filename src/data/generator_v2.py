@@ -135,14 +135,14 @@ class DataGenerator:
         
         return self.process_clusters(clusters, metadata)
 
-    def from_json(self, json_path: str, metadata=None, output_path="synthetic_data.json"):
+    def synthesize_from_json(self, json_path: str, metadata=None, output_path="synthetic_data.json"):
         cluster_engine = SemanticCluster(json_path=json_path)
         clusters = cluster_engine.build_clusters()
         generation = self.process_from_clusters(metadata)
         self.save_results(generation, output_path)
         return generation
 
-    def from_csv(self, csv_path: str, limit=None, metadata=None, output_path="synthetic_data.json"):
+    def synthesize_from_csv(self, csv_path: str, limit=None, metadata=None, output_path="synthetic_data.json"):
         cluster_engine = SemanticCluster()
         cluster_engine.process_csv(csv_path, limit=limit)
         clusters = cluster_engine.build_clusters()
@@ -150,7 +150,7 @@ class DataGenerator:
         self.save_results(generation, output_path)
         return generation
 
-    def from_text(self, texts: List[str], metadata=None, output_path="synthetic_data.json"):
+    def synthesize_from_text(self, texts: List[str], metadata=None, output_path="synthetic_data.json"):
         documents = [{"text": text} for text in texts]
         cluster_engine = SemanticCluster(texts=documents)
         clusters = cluster_engine.build_clusters()
@@ -173,4 +173,4 @@ if __name__ == "__main__":
         "The Declaration of Independence was signed on July 4, 1776, establishing the United States as a sovereign nation."
     ]
     csv_path = "/Users/goutham.krishnan/Documents/Work/eval/input_data/airbnb.csv"
-    generator.from_csv(csv_path, limit=50, output_path="airbnb_synthetic_data.json")
+    generator.synthesize_from_csv(csv_path, limit=50, output_path="airbnb_synthetic_data.json")

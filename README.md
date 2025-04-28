@@ -121,18 +121,18 @@ from eval.src.data.generator import SyntheticDataGenerator
 # Initialize the generator
 generator = SyntheticDataGenerator()
 
-# Load documents from JSON
-documents = generator.load_from_json(
-    path="data/documents/",  # Can be a directory of JSON files or a single JSON file
-    field="content"  # Optional: specify which field to use
-)
-
-# Generate synthetic data
+# Generate synthetic data directly from JSON files
 metadata = "Documents are technical articles about machine learning."
-generated_data = generator.synthesize(
-    documents=documents,
+generated_data = generator.synthesize_from_json(
+    path="data/documents/",  # Can be a directory of JSON files or a single JSON file
+    field="content",  # Optional: specify which field to use
     metadata=metadata
 )
+
+# Access the generated data
+questions = generated_data["questions"]
+answers = generated_data["answers"]
+reference_contexts = generated_data["reference_contexts"]
 
 # Use the generated data to create an evaluation dataset
 from eval.src.data.dataset import EvalDataset

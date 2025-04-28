@@ -214,7 +214,7 @@ if option == "Generate Data":
                             )
                             # Limit the number of documents
                             documents = documents[:limit]
-                            generated_data = generator.synthesize(
+                            generated_data = generator.synthesize_from_json(
                                 documents=documents,
                                 metadata=metadata,
                                 # Question generation parameters
@@ -367,7 +367,7 @@ if option == "Generate Data":
                 
                 with st.spinner("Generating synthetic data..."):
                     start_time = time.time()
-                    generated_data = generator.synthesize(
+                    generated_data = generator.synthesize_from_text(
                         documents=documents,
                         metadata=metadata,
                         # Question generation parameters
