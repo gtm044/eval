@@ -214,7 +214,7 @@ if option == "Generate Data":
                             )
                             # Limit the number of documents
                             documents = documents[:limit]
-                            generated_data = generator.synthesize_from_json(
+                            generated_data = generator.synthesize_from_text(
                                 documents=documents,
                                 metadata=metadata,
                                 # Question generation parameters
