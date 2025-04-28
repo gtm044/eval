@@ -60,6 +60,10 @@ class SemanticCluster:
             text = ". ".join([f"{t['head']} {t['type']} {t['tail']}" for t in triples])
             doc_texts.append(text)
             doc_ids.append(doc_id)
+            
+        # for key, value in self.document_knowledge_map.items():
+        #     print(key, value)
+        #     print("----")
 
         if not doc_texts:
             raise ValueError("No relations found. Ensure `build_graph()` is run first.")
@@ -97,6 +101,9 @@ class SemanticCluster:
             if cluster_id == -1:
                 continue
             cluster_documents[cluster_id] = [self.document_index[doc_id] for doc_id in doc_ids]
+            
+        if len(cluster_documents) == 0:
+            raise ValueError("No clusters found. Please use the single-hop generator for datasets with low semantic correlation.")
         
         for cluster_id, documents in cluster_documents.items():
             filename = f"{directory}/cluster_{cluster_id}.json"

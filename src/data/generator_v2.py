@@ -24,13 +24,13 @@ class DataGenerator:
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.client = OpenAI(api_key=self.api_key)
         
+        
     def generate_query(self, cluster_json: str):
         metadata = "No metadata is provided."
         messages = [
             {"role": "developer", "content": complex_query_prompt},
             {"role": "user", "content": f"Document Cluster: {cluster_json}\n\nMetadata: {metadata}"}
         ]
-        
         max_retries = 5
         for _ in range(max_retries):
             completion = self.client.chat.completions.create(
@@ -54,16 +54,36 @@ class DataGenerator:
             except:
                 pass
             messages.append({"role": "user", "content": "Please provide just the question text without any JSON formatting or code blocks."})
-        
         return "NO_QUESTION_POSSIBLE"
 
-    def generate_answer(self, cluster_json: str, question: str):
+
+    def generate_answer(self, cluster_json: str, question: str, **kwargs):
+        """
+        kwargs:
+            answer_style: str
+            answer_format: str
+            tone: str
+            max_length: int
+            include_citations: bool
+            additional_instructions: str
+            custom_instructions: str
+        """
+        rendered_prompt = render_complex_answer_prompt(
+            answer_style=kwargs.get("answer_style", None),
+            answer_format=kwargs.get("answer_format", None),
+            tone=kwargs.get("tone", None),
+            max_length=kwargs.get("max_length", None),
+            include_citations=kwargs.get("include_citations", None),
+            additional_instructions=kwargs.get("additional_instructions", None),
+            custom_instructions=kwargs.get("custom_instructions", None)
+        )
+        
         metadata = "No metadata is provided."
         messages = [
-            {"role": "developer", "content": complex_answer_prompt},
+            {"role": "developer", "content": rendered_prompt},
             {"role": "user", "content": f"Question: {question}\n\nDocument Cluster: {cluster_json}\n\nMetadata: {metadata}"}
         ]
-        
+                
         max_retries = 5
         for _ in range(max_retries):
             completion = self.client.chat.completions.create(
@@ -87,9 +107,10 @@ class DataGenerator:
             except json.JSONDecodeError:
                 messages.append({"role": "user", "content": "Your response must be a valid JSON object with an 'answers' array containing exactly 3 answers."})
         
-        return ["NO_ANSWER_POSSIBLE", "NO_ANSWER_POSSIBLE", "NO_ANSWER_POSSIBLE"]
+        return ["NO_ANSWER_POSSIBLE"] * 3
 
-    def process_clusters(self, clusters, metadata=None):
+
+    def process_clusters(self, clusters, metadata=None, **kwargs):
         references = []
         questions = []
         
@@ -106,7 +127,7 @@ class DataGenerator:
         for cluster, question in tqdm(zip(clusters, questions), desc="Generating answers", total=len(questions)):
             if question != "NO_QUESTION_POSSIBLE":
                 cluster_json = json.dumps(cluster)
-                answer = self.generate_answer(cluster_json, question)
+                answer = self.generate_answer(cluster_json, question, **kwargs)
                 answers.append(answer)
             else:
                 answers.append("NO_ANSWER_POSSIBLE")
@@ -117,12 +138,14 @@ class DataGenerator:
             
         return generation
 
+
     def save_results(self, generation, output_path="synthetic_data.json"):
         with open(output_path, "w") as f:
             json.dump(generation, f, indent=4)
         return output_path
 
-    def process_from_clusters(self, metadata=None):
+
+    def process_from_clusters(self, metadata=None, **kwargs):
         cluster_path = get_default_save_directory()
         cluster_files = os.listdir(cluster_path)
         clusters = []
@@ -136,9 +159,10 @@ class DataGenerator:
             os.remove(os.path.join(cluster_path, cluster_file))
         os.rmdir(cluster_path)
         
-        return self.process_clusters(clusters, metadata)
+        return self.process_clusters(clusters, metadata, **kwargs)
 
-    def synthesize_from_json(self, json_path: str, field: str = None, limit: int = None, metadata=None, output_path="synthetic_data.json"):
+
+    def synthesize_from_json(self, json_path: str, field: str = None, limit: int = None, metadata=None, output_path="synthetic_data.json", **kwargs):
         """
         Synthesize questions and answers from a JSON file
         
@@ -151,12 +175,13 @@ class DataGenerator:
         """
         cluster_engine = SemanticCluster()
         cluster_engine.process_json(json_path, field=field, limit=limit)
-        clusters = cluster_engine.build_clusters()
-        generation = self.process_from_clusters(metadata)
+        cluster_engine.build_clusters()
+        generation = self.process_from_clusters(metadata, **kwargs)
         self.save_results(generation, output_path)
         return generation
 
-    def synthesize_from_csv(self, csv_path: str, field: str = None, limit=None, metadata=None, output_path="synthetic_data.json"):
+
+    def synthesize_from_csv(self, csv_path: str, field: str = None, limit=None, metadata=None, output_path="synthetic_data.json", **kwargs):
         """
         Synthesize questions and answers from a CSV file
         
@@ -169,32 +194,22 @@ class DataGenerator:
         """
         cluster_engine = SemanticCluster()
         cluster_engine.process_csv(csv_path, field=field, limit=limit)
-        clusters = cluster_engine.build_clusters()
-        generation = self.process_from_clusters(metadata)
+        cluster_engine.build_clusters()
+        generation = self.process_from_clusters(metadata, **kwargs)
         self.save_results(generation, output_path)
         return generation
 
-    def synthesize_from_text(self, texts: List[str], metadata=None, output_path="synthetic_data.json"):
+
+    def synthesize_from_text(self, texts: List[str], metadata=None, output_path="synthetic_data.json", **kwargs):
         documents = [{"text": text} for text in texts]
         cluster_engine = SemanticCluster(texts=documents)
-        clusters = cluster_engine.build_clusters()
-        
-        if clusters is None or len(clusters) == 0:
-            raise ValueError("No clusters found. Please use the single-hop generator for datasets with low semantic correlation.")
-            
-        generation = self.process_from_clusters(metadata)
+        cluster_engine.build_clusters()
+        generation = self.process_from_clusters(metadata, **kwargs)
         self.save_results(generation, output_path)
         return generation
 
 
 if __name__ == "__main__":
     generator = DataGenerator()
-    texts = [
-        "The price of gold reached $88.16 per gram in the latest market update.",
-        "Copper prices have stabilized at $0.0098 per gram according to commodity traders.",
-        "The Great Wall of China stretches over 13,000 miles and is visible from space.",
-        "Paris is the capital of France and home to the Eiffel Tower, which was completed in 1889.",
-        "The Declaration of Independence was signed on July 4, 1776, establishing the United States as a sovereign nation."
-    ]
     csv_path = "/Users/goutham.krishnan/Documents/Work/eval/input_data/airbnb.csv"
-    generator.synthesize_from_csv(csv_path, limit=50, output_path="airbnb_synthetic_data.json")
+    generator.synthesize_from_csv(csv_path, limit=50, output_path="airbnb_synthetic_data2.json", answer_style="detailed", answer_format="json", tone="formal", max_length=100, include_citations=False, additional_instructions="Use the references to support your answer.", custom_instructions="Ensure the answer is concise and to the point.")
