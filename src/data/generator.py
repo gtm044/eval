@@ -18,10 +18,6 @@ from src.data.generator_v2 import DataGenerator
 
 load_dotenv()
 
-# Problem: 
-# Sometime really slow
-# Can we speed up the generation using multithreading since py3.13 has an optional GIL?
-
 def init_generator(type="single-hop"):
     if type == "single-hop":
         return SyntheticDataGenerator()
@@ -35,8 +31,7 @@ class SyntheticDataGenerator:
         self.api_key = os.environ["OPENAI_API_KEY"]
         self.openai = OpenAI(api_key=self.api_key)
 
-    def generate_questions(self, documents: List[str], metadata: str = None, 
-                           custom_instructions: str = None, example_questions: List[str] = None) -> List[str]:
+    def generate_questions(self, documents: List[str], metadata: str = None, **kwargs) -> List[str]:
         """
         Generate questions for the provided documents.
         Maintains conversation history for the previous 10 question generations.
@@ -44,42 +39,37 @@ class SyntheticDataGenerator:
         Args:
             documents: List of documents to generate questions for
             metadata: Optional metadata about the documents
-            custom_instructions: Optional custom instructions for question generation
-            example_questions: Optional list of example questions
+            **kwargs: Additional parameters including:
+                - custom_instructions: Optional custom instructions for question generation
+                - example_questions: Optional list of example questions
         """
         metadata = metadata if metadata is not None else "Document is plain text, hence no metadata is provided."
         questions = []
         conversation_history = []
         
-        # Render the query prompt with the provided parameters
         rendered_prompt = render_synthetic_query_prompt(
-            custom_instructions=custom_instructions,
-            example_questions=example_questions
+            custom_instructions=kwargs.get("custom_instructions"),
+            example_questions=kwargs.get("example_questions")
         )
         
         for document in tqdm(documents, desc="Generating questions"):
-            # Build messages with conversation history
             messages = [
                 {
                     "role": "developer",
                     "content": rendered_prompt
                 }
             ]
-            # Add conversation history (up to 10 previous exchanges)
             messages.extend(conversation_history)
-            # Add current document request
             messages.append({
                 "role": "user",
                 "content": f"Document: {document}\n\nMetadata: {metadata}"
             })
-            # Generate question
             completion = self.openai.chat.completions.create(
                 model = "gpt-4o",
                 messages = messages,
             )            
             response = completion.choices[0].message
             questions.append(response.content) 
-            # Update conversation history
             conversation_history.append({
                 "role": "user",
                 "content": f"Document: {document}\n\nMetadata: {metadata}"
@@ -88,17 +78,12 @@ class SyntheticDataGenerator:
                 "role": "assistant",
                 "content": response.content
             })            
-            # Keep only the last 10 exchanges (20 messages - user and assistant pairs)
             if len(conversation_history) > 20:
                 conversation_history = conversation_history[-20:]
                 
         return questions
 
-    def generate_answers(self, documents: List[str], questions: List[str], metadata: str = None,
-                        answer_style: str = None, answer_format: str = None, 
-                        tone: str = None, max_length: int = None,
-                        include_citations: bool = False, additional_instructions: str = None,
-                        custom_instructions: str = None) -> List[str]:
+    def generate_answers(self, documents: List[str], questions: List[str], metadata: str = None, **kwargs) -> List[str]:
         """
         Generate answers with LLM
         
@@ -106,31 +91,30 @@ class SyntheticDataGenerator:
             documents: List of documents
             questions: List of questions
             metadata: Optional metadata about the documents
-            answer_style: Optional style instructions for the answers
-            answer_format: Optional format instructions for the answers
-            tone: Optional tone for the answers
-            max_length: Optional maximum length for answers
-            include_citations: Whether to include citations
-            additional_instructions: Optional additional instructions
-            custom_instructions: Optional custom instructions that override default behavior
+            **kwargs: Additional parameters including:
+                - answer_style: Optional style instructions for the answers
+                - answer_format: Optional format instructions for the answers
+                - tone: Optional tone for the answers
+                - max_length: Optional maximum length for answers
+                - include_citations: Whether to include citations
+                - additional_instructions: Optional additional instructions
+                - custom_instructions: Optional custom instructions that override default behavior
         """
         answers = []
         metadata = metadata if metadata is not None else "Document is plain text, hence no metadata is provided."
         
-        # Render the answer prompt with the provided parameters
         rendered_prompt = render_synthetic_valid_answer_prompt(
-            answer_style=answer_style,
-            answer_format=answer_format,
-            tone=tone,
-            max_length=max_length,
-            include_citations=include_citations,
-            additional_instructions=additional_instructions,
-            custom_instructions=custom_instructions
+            answer_style=kwargs.get("answer_style"),
+            answer_format=kwargs.get("answer_format"),
+            tone=kwargs.get("tone"),
+            max_length=kwargs.get("max_length"),
+            include_citations=kwargs.get("include_citations", False),
+            additional_instructions=kwargs.get("additional_instructions"),
+            custom_instructions=kwargs.get("custom_instructions")
         )
         
         for question, document in tqdm(zip(questions, documents), desc="Generating answers", total=len(questions)):
-            # Generate candidate answer with LLM
-            if question == "NO_QUESTION_POSSIBLE": # Dont generate answer for the tuple if question is "NO_QUESTION_POSSIBLE"
+            if question == "NO_QUESTION_POSSIBLE":
                 answers.append("NO_ANSWER_POSSIBLE")
                 continue
             completion = self.openai.chat.completions.create(
@@ -148,30 +132,15 @@ class SyntheticDataGenerator:
             )
             candidate_answer = completion.choices[0].message.content
             
-            # Process the candidate answer json string
-            # Remove the ```json from the beginning and end of the string
             candidate_answer = candidate_answer.replace("```json", "").replace("```", "")
             
-            # Convert the string to a json object
             candidate_answer = json.loads(candidate_answer)
             
-            # Append the answers to the answers list
             answers.append(candidate_answer["answers"])
             
         return answers
     
-    def synthesize_from_text(self, documents: List[str], metadata=None, expand=False,
-                  # Question generation parameters
-                  question_custom_instructions: str = None, 
-                  example_questions: List[str] = None,
-                  # Answer generation parameters
-                  answer_style: str = None, 
-                  answer_format: str = None,
-                  tone: str = None, 
-                  max_length: int = None,
-                  include_citations: bool = False, 
-                  additional_instructions: str = None,
-                  answer_custom_instructions: str = None):
+    def synthesize_from_text(self, documents: List[str], metadata=None, expand=False, output_path: str = "generation.json", **kwargs):
         """
         Synthesize questions and answers for the provided documents.
         
@@ -179,15 +148,17 @@ class SyntheticDataGenerator:
             documents: List of documents
             metadata: Optional metadata about the documents
             expand: Whether to expand documents
-            question_custom_instructions: Custom instructions for question generation
-            example_questions: Example questions for question generation
-            answer_style: Style instructions for the answers
-            answer_format: Format instructions for the answers
-            tone: Tone for the answers
-            max_length: Maximum length for answers
-            include_citations: Whether to include citations
-            additional_instructions: Additional instructions for answer generation
-            answer_custom_instructions: Custom instructions for answer generation
+            output_path: Path to save the generated data
+            **kwargs: Additional parameters for question and answer generation including:
+                - question_custom_instructions: Custom instructions for question generation
+                - example_questions: Example questions for question generation
+                - answer_style: Style instructions for the answers
+                - answer_format: Format instructions for the answers
+                - tone: Tone for the answers
+                - max_length: Maximum length for answers
+                - include_citations: Whether to include citations
+                - additional_instructions: Additional instructions for answer generation
+                - answer_custom_instructions: Custom instructions for answer generation
             
         Returns:
             questions: List[str] -> List of questions
@@ -200,24 +171,23 @@ class SyntheticDataGenerator:
         questions = self.generate_questions(
             documents, 
             metadata, 
-            custom_instructions=question_custom_instructions,
-            example_questions=example_questions
+            custom_instructions=kwargs.get("question_custom_instructions"),
+            example_questions=kwargs.get("example_questions")
         )
         
         answers = self.generate_answers(
             documents, 
             questions, 
             metadata,
-            answer_style=answer_style,
-            answer_format=answer_format,
-            tone=tone,
-            max_length=max_length,
-            include_citations=include_citations,
-            additional_instructions=additional_instructions,
-            custom_instructions=answer_custom_instructions
+            answer_style=kwargs.get("answer_style"),
+            answer_format=kwargs.get("answer_format"),
+            tone=kwargs.get("tone"),
+            max_length=kwargs.get("max_length"),
+            include_citations=kwargs.get("include_citations", False),
+            additional_instructions=kwargs.get("additional_instructions"),
+            custom_instructions=kwargs.get("answer_custom_instructions")
         )        
                 
-        # Filter out data points where question or answer is "NULL"
         valid_indices = []
         for i, (question, answer) in enumerate(zip(questions, answers)):
             if question != "NO_QUESTION_POSSIBLE" or answer != "NO_ANSWER_POSSIBLE":
@@ -227,62 +197,50 @@ class SyntheticDataGenerator:
         filtered_answers = [answers[i] for i in valid_indices]
         filtered_contexts = [reference_contexts[i] for i in valid_indices]
         
+        generation = []
+        for question, answer, reference in zip(filtered_questions, filtered_answers, filtered_contexts):
+            generation.append({"question": question, "answers": answer, "reference": reference})
+            
+        with open(output_path, "w") as f:
+            json.dump(generation, f, indent=4)  
+        
         return {
             "questions": filtered_questions,
             "answers": filtered_answers,
             "reference_contexts": filtered_contexts
         }
         
-    def synthesize_from_csv(self, path: str, field: str = None, metadata: str = None,
-                           # Question generation parameters
-                           question_custom_instructions: str = None, 
-                           example_questions: List[str] = None,
-                           # Answer generation parameters
-                           answer_style: str = None, 
-                           answer_format: str = None,
-                           tone: str = None, 
-                           max_length: int = None,
-                           include_citations: bool = False, 
-                           additional_instructions: str = None,
-                           answer_custom_instructions: str = None):
+    def synthesize_from_csv(self, path: str, field: str = None, metadata: str = None, output_path: str = "generation.json", limit: int = None, **kwargs):
         """
         Synthesize questions and answers for the provided csv file.
+        
+        Args:
+            path: Path to the CSV file
+            field: Field name in the CSV to use
+            metadata: Optional metadata about the documents
+            output_path: Path to save the generated data
+            limit: Maximum number of records to process
+            **kwargs: Additional parameters for question and answer generation
         """
         df = pd.read_csv(path)
-        # Set all the null values to "null"
         df = df.fillna("null")
+        
+        if limit is not None:
+            df = df[:limit]
+            
         df.to_json("data.json", orient="records")
         documents = self.load_from_json("data.json", field)
         
-        # Delete the json file
         os.remove("data.json")
         
         return self.synthesize_from_text(
             documents, 
             metadata,
-            question_custom_instructions=question_custom_instructions,
-            example_questions=example_questions,
-            answer_style=answer_style,
-            answer_format=answer_format,
-            tone=tone,
-            max_length=max_length,
-            include_citations=include_citations,
-            additional_instructions=additional_instructions,
-            answer_custom_instructions=answer_custom_instructions
+            output_path=output_path,
+            **kwargs
         )
     
-    def synthesize_from_json(self, path: str, field: str = None, metadata: str = None,
-                           # Question generation parameters
-                           question_custom_instructions: str = None, 
-                           example_questions: List[str] = None,
-                           # Answer generation parameters
-                           answer_style: str = None, 
-                           answer_format: str = None,
-                           tone: str = None, 
-                           max_length: int = None,
-                           include_citations: bool = False, 
-                           additional_instructions: str = None,
-                           answer_custom_instructions: str = None):
+    def synthesize_from_json(self, path: str, field: str = None, metadata: str = None, output_path: str = "generation.json", limit: int = None, **kwargs):
         """
         Synthesize questions and answers directly from a JSON file or directory.
         
@@ -290,30 +248,20 @@ class SyntheticDataGenerator:
             path: Path to the JSON file or directory containing JSON files
             field: Field name in the JSON object containing the raw documents
             metadata: Optional metadata about the documents
-            question_custom_instructions: Custom instructions for question generation
-            example_questions: Example questions for question generation
-            answer_style: Style instructions for the answers
-            answer_format: Format instructions for the answers
-            tone: Tone for the answers
-            max_length: Maximum length for answers
-            include_citations: Whether to include citations
-            additional_instructions: Additional instructions for answer generation
-            answer_custom_instructions: Custom instructions for answer generation
+            output_path: Path to save the generated data
+            limit: Maximum number of records to process
+            **kwargs: Additional parameters for question and answer generation
         """
         documents = self.load_from_json(path, field)
+        
+        if limit is not None:
+            documents = documents[:limit]
         
         return self.synthesize_from_text(
             documents, 
             metadata,
-            question_custom_instructions=question_custom_instructions,
-            example_questions=example_questions,
-            answer_style=answer_style,
-            answer_format=answer_format,
-            tone=tone,
-            max_length=max_length,
-            include_citations=include_citations,
-            additional_instructions=additional_instructions,
-            answer_custom_instructions=answer_custom_instructions
+            output_path=output_path,
+            **kwargs
         )
         
     def load_from_json(self, path: str, field: str = None):
@@ -326,7 +274,6 @@ class SyntheticDataGenerator:
         
         Returns a list of raw documents.
         """
-        # Check if the given path is a directory or a file
         if os.path.isdir(path):
             files = os.listdir(path)
             documents = []
@@ -356,7 +303,6 @@ if __name__ == "__main__":
     import argparse
     import tiktoken
     
-    # Parse command line arguments
     parser = argparse.ArgumentParser(description='Generate synthetic data from CSV or JSON files')
     parser.add_argument('--path', type=str, required=True, help='Path to the CSV or JSON file')
     parser.add_argument('--metadata-file', type=str, required=True, help='Path to a .txt file containing metadata description')
@@ -364,11 +310,9 @@ if __name__ == "__main__":
     parser.add_argument('--limit', type=int, default=None, help='Limit number of rows to process (optional)')
     parser.add_argument('--format', type=str, choices=['csv', 'json'], required=True, help='File format (csv or json)')
     
-    # Add arguments for question generation customization
     parser.add_argument('--question-instructions', type=str, help='Custom instructions for question generation')
     parser.add_argument('--example-questions', type=str, help='Comma-separated list of example questions')
     
-    # Add arguments for answer generation customization
     parser.add_argument('--answer-style', type=str, help='Style instructions for answers')
     parser.add_argument('--answer-format', type=str, help='Format instructions for answers')
     parser.add_argument('--tone', type=str, help='Tone for answers')
@@ -379,24 +323,20 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
-    # Read metadata from the provided file
     with open(args.metadata_file, 'r') as f:
         metadata = f.read().strip()
     
-    # Parse example questions if provided
     example_questions = None
     if args.example_questions:
         example_questions = [q.strip() for q in args.example_questions.split(',')]
     
-    # Start measuring time and memory
     start_time = time.time()
     process = psutil.Process(os.getpid())
-    start_memory = process.memory_info().rss / 1024 / 1024  # Memory in MB
+    start_memory = process.memory_info().rss / 1024 / 1024
     
     generator = SyntheticDataGenerator()
     
     if args.format == 'csv':
-        # Load and preprocess CSV data if needed
         if args.limit:
             df = pd.read_csv(args.path)
             df = df[:args.limit]
@@ -430,12 +370,10 @@ if __name__ == "__main__":
                 additional_instructions=args.additional_instructions,
                 answer_custom_instructions=args.answer_instructions
             )
-    else:  # json
+    else:
         if args.limit:
-            # Load documents and limit them
             documents = generator.load_from_json(path=args.path, field=args.field)
             documents = documents[:args.limit]
-            # Create temporary JSON file with limited documents
             temp_path = "temp_limited_data.json"
             with open(temp_path, 'w') as f:
                 json.dump(documents, f)
@@ -469,16 +407,14 @@ if __name__ == "__main__":
                 answer_custom_instructions=args.answer_instructions
             )
     
-    # End measuring time and memory
     end_time = time.time()
-    end_memory = process.memory_info().rss / 1024 / 1024  # Memory in MB
+    end_memory = process.memory_info().rss / 1024 / 1024
     
     questions = generated_data["questions"]
     answers = generated_data["answers"]
     reference_contexts = generated_data["reference_contexts"]
     
-    # Calculate token counts using tiktoken
-    encoding = tiktoken.get_encoding("cl100k_base")  # Using GPT-4o model encoding
+    encoding = tiktoken.get_encoding("cl100k_base")
     total_tokens = 0
     
     for question, answer, reference_context in zip(questions, answers, reference_contexts):
@@ -487,17 +423,14 @@ if __name__ == "__main__":
         print("Reference context:", reference_context)
         print("\n\n")
         
-        # Count tokens for each item
         question_tokens = len(encoding.encode(question))
         answer_tokens = len(encoding.encode(str(answer)))
         total_tokens += question_tokens + answer_tokens
     
-    # Calculate token generation metrics
     processing_time = end_time - start_time
     tokens_per_second = total_tokens / processing_time if processing_time > 0 else 0
     seconds_per_token = processing_time / total_tokens if total_tokens > 0 else 0
     
-    # Print performance metrics
     from tabulate import tabulate
     
     metrics_data = [
@@ -509,13 +442,11 @@ if __name__ == "__main__":
         ["Average time per token", f"{seconds_per_token:.4f} seconds"]
     ]
     
-    # Print the table
     print("\n" + "="*50)
     print("Performance Metrics")
     print("="*50)
     print(tabulate(metrics_data, headers=["Metric", "Value"], numalign="left"))
     print("="*50 + "\n")
     
-    # Save the questions and answers to a json file
     with open("generation.json", "w") as f:
         json.dump({"questions": questions, "answers": answers, "reference_contexts": reference_contexts}, f, indent=4)

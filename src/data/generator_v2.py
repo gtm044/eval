@@ -1,3 +1,6 @@
+# A cleaner, multi-hop implementation of `generator.py`.
+# Will deprecate `generator.py` in the future, after integrating single-hop generation and custom instructions.
+
 from openai import OpenAI
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
@@ -135,16 +138,37 @@ class DataGenerator:
         
         return self.process_clusters(clusters, metadata)
 
-    def synthesize_from_json(self, json_path: str, metadata=None, output_path="synthetic_data.json"):
-        cluster_engine = SemanticCluster(json_path=json_path)
+    def synthesize_from_json(self, json_path: str, field: str = None, limit: int = None, metadata=None, output_path="synthetic_data.json"):
+        """
+        Synthesize questions and answers from a JSON file
+        
+        Args:
+            json_path: Path to the JSON file
+            field: Field name in JSON to use for document content
+            limit: Maximum number of records to process
+            metadata: Optional metadata about the documents
+            output_path: Path to save the generated data
+        """
+        cluster_engine = SemanticCluster()
+        cluster_engine.process_json(json_path, field=field, limit=limit)
         clusters = cluster_engine.build_clusters()
         generation = self.process_from_clusters(metadata)
         self.save_results(generation, output_path)
         return generation
 
-    def synthesize_from_csv(self, csv_path: str, limit=None, metadata=None, output_path="synthetic_data.json"):
+    def synthesize_from_csv(self, csv_path: str, field: str = None, limit=None, metadata=None, output_path="synthetic_data.json"):
+        """
+        Synthesize questions and answers from a CSV file
+        
+        Args:
+            csv_path: Path to the CSV file
+            field: Field name in CSV to use for document content
+            limit: Maximum number of records to process
+            metadata: Optional metadata about the documents
+            output_path: Path to save the generated data
+        """
         cluster_engine = SemanticCluster()
-        cluster_engine.process_csv(csv_path, limit=limit)
+        cluster_engine.process_csv(csv_path, field=field, limit=limit)
         clusters = cluster_engine.build_clusters()
         generation = self.process_from_clusters(metadata)
         self.save_results(generation, output_path)

@@ -9,19 +9,26 @@ import json
 import os
 
 class SemanticCluster:
-    def __init__(self, json_path: Optional[str] = None, texts: Optional[List[str]] = None):
+    def __init__(self, texts: Optional[List[str]] = None):
         if texts:
             self.documents = texts
         else:
             self.documents = None
-        if json_path:
-            with open(json_path, 'r') as f:
-                self.documents = json.load(f)
         self.document_knowledge_map = {} # Mapping documents to their knowledge(entity, relation, entity)
         self.document_index = {}
+        
+    def process_json(self, json_path: str, field: str = None, limit: Optional[int] = None):
+        with open(json_path, 'r') as f:
+            self.documents = json.load(f)
+        if field:
+            self.documents = [{field: doc[field]} for doc in self.documents]
+        if limit:
+            self.documents = self.documents[:limit]
                 
-    def process_csv(self, csv_path: str, limit: Optional[int] = None):
+    def process_csv(self, csv_path: str, field: str = None, limit: Optional[int] = None):
         df = pd.read_csv(csv_path)
+        if field:
+            df = df[field]
         if limit:
             df = df.head(limit)
         self.documents = df.to_dict(orient='records')
@@ -152,15 +159,16 @@ if __name__=='__main__':
                         help='Clustering algorithm to use (hdbscan or kmeans)')
     parser.add_argument('--num_clusters', type=int, default=5, help='Number of clusters for KMeans')
     parser.add_argument('--min_cluster_size', type=int, default=2, help='Minimum cluster size for HDBSCAN')
+    parser.add_argument('--field', type=str, default=None, help='Field to use for JSON input')
     
     args = parser.parse_args()
     
     kg = SemanticCluster()
     
     if args.input_type == 'csv':
-        kg.process_csv(args.input, limit=args.limit)
+        kg.process_csv(args.input, field=args.field, limit=args.limit)
     else:  # json
-        kg = SemanticCluster(json_path=args.input)
+        kg.process_json(args.input, field=args.field, limit=args.limit)
     
     use_hdbscan = args.cluster_type == 'hdbscan'
     clusters = kg.build_clusters(use_hdbscan=use_hdbscan, 

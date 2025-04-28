@@ -87,23 +87,28 @@ For generation and perf logging (memory and runtime):
 #### From CSV Files
 
 ```python
-from eval.src.data.generator import SyntheticDataGenerator
+from eval.src.data.generator import init_generator
 
 # Initialize the generator
-generator = SyntheticDataGenerator()
+generator = init_generator(type="single-hop") # type="mulit-hop" for complex multi-hop data generator
 
 # Generate synthetic data from a CSV file
 metadata = "Document contains product descriptions with fields: name, description, price, and category."
 generated_data = generator.synthesize_from_csv(
     path="data/products.csv",
     field="description",  # Optional: specify which field to use
-    metadata=metadata
+    limit=10, # Optional: limit the number of rows to process
+    metadata=metadata,
+    output_path = "generation.json" # Optional, will use a default path if not provided
 )
 
 # Access the generated data
-questions = generated_data["questions"]
-answers = generated_data["answers"]
-reference_contexts = generated_data["reference_contexts"]
+output_json = json.load(open("generation.json"))
+questions = [d["question"] for d in output_json]
+answers = [d["answers"] for d in output_json]
+reference_contexts = [d["reference"] for d in output_json]
+# or
+questions, answers, reference_contexts = generated_data["questions"], generated_data["answers"], generated_data["reference_contexts"]
 
 # Print sample data
 for question, answer, context in zip(questions, answers, reference_contexts):
@@ -116,36 +121,36 @@ for question, answer, context in zip(questions, answers, reference_contexts):
 #### From JSON Documents
 
 ```python
-from eval.src.data.generator import SyntheticDataGenerator
+from eval.src.data.generator import init_generator
 
 # Initialize the generator
-generator = SyntheticDataGenerator()
+generator = init_generator(type="single-hop") # type="mulit-hop" for complex multi-hop data generator
 
 # Generate synthetic data directly from JSON files
 metadata = "Documents are technical articles about machine learning."
 generated_data = generator.synthesize_from_json(
     path="data/documents/",  # Can be a directory of JSON files or a single JSON file
     field="content",  # Optional: specify which field to use
-    metadata=metadata
+    limit=10, # Optional: limit the number of rows to process
+    metadata=metadata,
+    output_path = "generation.json" # Optional, will use a default path if not provided
 )
 
 # Access the generated data
-questions = generated_data["questions"]
-answers = generated_data["answers"]
-reference_contexts = generated_data["reference_contexts"]
+output_json = json.load(open("generation.json"))
+questions = [d["question"] for d in output_json]
+answers = [d["answers"] for d in output_json]
+reference_contexts = [d["reference"] for d in output_json]
+# or
+questions, answers, reference_contexts = generated_data["questions"], generated_data["answers"], generated_data["reference_contexts"]
 
-# Use the generated data to create an evaluation dataset
-from eval.src.data.dataset import EvalDataset
+# Print sample data
+for question, answer, context in zip(questions, answers, reference_contexts):
+    print(f"Question: {question}")
+    print(f"Answer: {answer}")
+    print(f"Context: {context}")
+    print("---")
 
-eval_dataset = EvalDataset(
-    questions=generated_data["questions"],
-    answers=generated_data["answers"],
-    reference_contexts=generated_data["reference_contexts"],
-    # You'll need to add responses and retrieved_contexts after running your RAG system
-)
-
-# Save the dataset
-eval_dataset.to_json("datasets/synthetic_eval_dataset.json")
 ```
 
 ### Basic Evaluation
