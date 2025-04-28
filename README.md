@@ -90,7 +90,7 @@ For generation and perf logging (memory and runtime):
 from eval.src.data.generator import init_generator
 
 # Initialize the generator
-generator = init_generator(type="single-hop") # type="mulit-hop" for complex multi-hop data generator
+generator = init_generator(multi_hop=False) # multi-hop=True for complex multi-hop data generator
 
 # Generate synthetic data from a CSV file
 metadata = "Document contains product descriptions with fields: name, description, price, and category."
@@ -124,7 +124,7 @@ for question, answer, context in zip(questions, answers, reference_contexts):
 from eval.src.data.generator import init_generator
 
 # Initialize the generator
-generator = init_generator(type="single-hop") # type="mulit-hop" for complex multi-hop data generator
+generator = init_generator(multi_hop=False) # multi-hop=True for complex multi-hop data generator       
 
 # Generate synthetic data directly from JSON files
 metadata = "Documents are technical articles about machine learning."

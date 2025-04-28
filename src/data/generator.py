@@ -18,13 +18,11 @@ from src.data.generator_v2 import DataGenerator
 
 load_dotenv()
 
-def init_generator(type="single-hop"):
-    if type == "single-hop":
-        return SyntheticDataGenerator()
-    elif type == "multi-hop":
+def init_generator(multi_hop: bool = False):
+    if multi_hop:
         return DataGenerator()
     else:
-        raise ValueError(f"Invalid generator type: {type}. Options: single-hop, multi-hop")
+        return SyntheticDataGenerator()
 
 class SyntheticDataGenerator:
     def __init__(self):
