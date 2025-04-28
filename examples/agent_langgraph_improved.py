@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 import json
-from src.langgraph.trace_improved import create_traced_agent, log_traces, TraceContext
+from src.langgraph.trace_v2 import create_traced_agent, log_traces, TraceContext
 load_dotenv()
 
 metal_price = {
