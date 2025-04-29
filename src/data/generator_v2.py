@@ -75,7 +75,8 @@ class DataGenerator:
             max_length=kwargs.get("max_length", None),
             include_citations=kwargs.get("include_citations", None),
             additional_instructions=kwargs.get("additional_instructions", None),
-            custom_instructions=kwargs.get("custom_instructions", None)
+            custom_instructions=kwargs.get("custom_instructions", None),
+            agent_prompt=kwargs.get("agent_prompt", None)
         )
         
         metadata = "No metadata is provided."
@@ -212,4 +213,6 @@ class DataGenerator:
 if __name__ == "__main__":
     generator = DataGenerator()
     csv_path = "/Users/goutham.krishnan/Documents/Work/eval/input_data/airbnb.csv"
-    generator.synthesize_from_csv(csv_path, limit=50, output_path="airbnb_synthetic_data2.json", answer_style="detailed", answer_format="json", tone="formal", max_length=100, include_citations=False, additional_instructions="Use the references to support your answer.", custom_instructions="Ensure the answer is concise and to the point.")
+    # generator.synthesize_from_csv(csv_path, limit=50, output_path="airbnb_synthetic_data2.json", answer_style="detailed", answer_format="json", tone="formal", max_length=100, include_citations=False, additional_instructions="Use the references to support your answer.", custom_instructions="Ensure the answer is concise and to the point.")
+    
+    generator.synthesize_from_csv(csv_path, limit=20, output_path="new_prompt.json", agent_prompt="You are a helpful assistant that answers questions about the data in a funny manner. Include puns and jokes in your answers. The answer should not be too long, keep it concise.")

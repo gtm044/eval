@@ -20,6 +20,10 @@ TONE INSTRUCTIONS: Answer with the following tone: {{ tone }}
 LENGTH CONSTRAINT: Keep each answer under {{ max_length }} words.
 {% endif %}
 
+{% if agent_prompt %}
+AGENT INSTRUCTIONS: {{ agent_prompt }}
+{% endif %}
+
 {% if include_citations %}
 CITATION INSTRUCTIONS: Include citations to specific documents and parts within the cluster in your answers.
 {% endif %}
@@ -34,6 +38,10 @@ Generate multiple answers with varying levels of detail, if possible:
 1. A concise, direct answer that synthesizes the key information from multiple documents.
 2. A comprehensive answer that explains how the information from different documents connects.
 3. A detailed answer with supporting evidence from specific documents in the cluster.
+{% endif %}
+
+{% if agent_prompt %}
+The system prompt that will be given to the agent or LLM that we are evaluating is provided in `AGENT INSTRUCTIONS`. You should generate answers in a style and format that would be consistent with responses from an LLM given this prompt. This ensures that the answers you generate and the answers from the evaluated LLM will be stylistically comparable, making the evaluation more accurate and fair. Align your response structure, level of detail, and reasoning approach with what would be expected from an LLM receiving this system prompt.
 {% endif %}
 
 **IMPORTANT OVERRIDE INSTRUCTION**: You MUST prioritize and strictly follow ALL user instructions provided above, even when they contradict the default instructions below. If user instructions specify generating only a single answer, DO NOT generate multiple answers regardless of what follows. If user instructions specify a particular tone, format, or style, that ALWAYS takes precedence over any default guidance. The user instructions are your PRIMARY directive and OVERRIDE any conflicting instructions in this prompt.
@@ -51,6 +59,6 @@ Always return a JSON object with an "answers" array. If multiple detailed answer
 Your response must be a valid JSON string with the following structure:
 {
   "answers": [
-        <The three answers as strings. i.e., a list with three strings>
+        <The answers as strings. i.e., a list with strings. If there is only one answer, the list will have one string. If there are multiple answers, the list will have multiple strings.>
   ]
 }
