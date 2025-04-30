@@ -165,7 +165,7 @@ class DataGenerator:
 
     def synthesize_from_json(self, json_path: str, field: str = None, limit: int = None, metadata=None, output_path="synthetic_data.json", **kwargs):
         """
-        Synthesize questions and answers from a JSON file
+        Synthesize from a JSON file
         
         Args:
             json_path: Path to the JSON file
@@ -184,7 +184,7 @@ class DataGenerator:
 
     def synthesize_from_csv(self, csv_path: str, field: str = None, limit=None, metadata=None, output_path="synthetic_data.json", **kwargs):
         """
-        Synthesize questions and answers from a CSV file
+        Synthesize from a CSV file
         
         Args:
             csv_path: Path to the CSV file

@@ -31,9 +31,6 @@ class SyntheticDataGenerator:
 
     def generate_questions(self, documents: List[str], metadata: str = None, **kwargs) -> List[str]:
         """
-        Generate questions for the provided documents.
-        Maintains conversation history for the previous 10 question generations.
-        
         Args:
             documents: List of documents to generate questions for
             metadata: Optional metadata about the documents
@@ -83,8 +80,6 @@ class SyntheticDataGenerator:
 
     def generate_answers(self, documents: List[str], questions: List[str], metadata: str = None, **kwargs) -> List[str]:
         """
-        Generate answers with LLM
-        
         Args:
             documents: List of documents
             questions: List of questions
@@ -140,8 +135,6 @@ class SyntheticDataGenerator:
     
     def synthesize_from_text(self, documents: List[str], metadata=None, expand=False, output_path: str = "generation.json", **kwargs):
         """
-        Synthesize questions and answers for the provided documents.
-        
         Args:
             documents: List of documents
             metadata: Optional metadata about the documents
@@ -210,8 +203,6 @@ class SyntheticDataGenerator:
         
     def synthesize_from_csv(self, path: str, field: str = None, metadata: str = None, output_path: str = "generation.json", limit: int = None, **kwargs):
         """
-        Synthesize questions and answers for the provided csv file.
-        
         Args:
             path: Path to the CSV file
             field: Field name in the CSV to use
@@ -240,8 +231,6 @@ class SyntheticDataGenerator:
     
     def synthesize_from_json(self, path: str, field: str = None, metadata: str = None, output_path: str = "generation.json", limit: int = None, **kwargs):
         """
-        Synthesize questions and answers directly from a JSON file or directory.
-        
         Args:
             path: Path to the JSON file or directory containing JSON files
             field: Field name in the JSON object containing the raw documents
@@ -264,13 +253,9 @@ class SyntheticDataGenerator:
         
     def load_from_json(self, path: str, field: str = None):
         """
-        Loads the raw documents from a json file.
-        
         Input arguments:
         path: str -> Path to the folder containing the json files or path to the file containing a single json file with multiple json objects.
         field: str -> Field name in the json object containing the raw documents.
-        
-        Returns a list of raw documents.
         """
         if os.path.isdir(path):
             files = os.listdir(path)
