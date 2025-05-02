@@ -1,10 +1,10 @@
 # RAG Evaluation Framework
 
-A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) systems using RAGAS and synthesizing ground truth data from raw documents.
+A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) and Agentic systems using RAGAS and synthesizing ground truth data from raw documents.
 
 ## Overview
 
-This framework provides tools and metrics to evaluate RAG systems across three key components:
+This framework provides tools and metrics to evaluate RAG/AI systems across three key components:
 - Chunking evaluation
 - Retrieval evaluation
 - Generation evaluation
@@ -210,7 +210,7 @@ Results are stored in `.results-<experiment_id>`
 
 ### Agent Evaluation
 
-Example provided in [`agentic_evaluation`](examples/agent_langgraph.py)
+Example provided in [`agent_langgraph_improved.py`](examples/agent_langgraph_improved.py)
 
 ### Tracing LangGraph and LangChain
 
@@ -218,7 +218,6 @@ Example provided in [`agentic_evaluation`](examples/agent_langgraph.py)
 # LangGraph tracing
 from eval.src.langgraph.trace_v2 import create_traced_agent, log_traces
 
-# Create your LangGraph agent
 # ... your agent implementation ...
 react_graph = builder.compile()
 
