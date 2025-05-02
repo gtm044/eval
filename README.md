@@ -254,16 +254,7 @@ interceptor.log()
 
 ## Roadmap
 
-1. **Advanced features**
    - Multi-turn conversation evaluation
-   - Composite, multi-hop question answer generator
-
-2. **Multimodal RAG Support**
-   - Image retrieval evaluation
-   - Table content processing
+   - Image/structured data retrieval evaluation
    - Cross-modal metrics
-
-3. **Agentic Evaluation**
-   - Advanced tool call evaluation
    - Node transition evaluation
-   - Context-aware evaluation for complex agentic workflows
