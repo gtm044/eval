@@ -91,15 +91,12 @@ class EvalDataset(BaseModel):
         with open(json_path, "r") as f:
             data = json.load(f)
             
-        # Initialize empty lists for each field
         questions = []
         answers = []
         responses = []
         reference_contexts = []
         retrieved_contexts = []
         
-        
-        # Extract data from each document
         for doc in data:
             if doc.get("question") is not None:
                 questions.append(doc["question"])
@@ -112,7 +109,6 @@ class EvalDataset(BaseModel):
             if doc.get("retrieved_contexts") is not None:
                 retrieved_contexts.append(doc["retrieved_contexts"])
         
-        # Create dataset with non-empty fields
         dataset_dict = {}
         if questions:
             dataset_dict["questions"] = questions
@@ -134,11 +130,9 @@ class EvalDataset(BaseModel):
         data = info.data  
         # Filter out None fields
         filtered_data = {field: data[field] for field in {"questions", "answers", "responses", "reference_contexts", "retrieved_contexts"} if field in data and data[field] is not None}
-        # Log the length of each field in the filtered data
         error_message = ""
         for field, value in filtered_data.items():
             error_message += f"{field}: {len(value)}\n"
-        # If at least one field is provided, check lengths
         if filtered_data:
             # Get the length of each field, accounting for answers and retrieved_contexts being lists of lists
             lengths = []

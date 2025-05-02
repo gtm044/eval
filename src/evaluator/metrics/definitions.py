@@ -22,7 +22,7 @@ context_score = context_score
 named_entity_score = named_entity_score
 llm_grading = llm_grading
 
-# # New Advanced Faithfulness Metrics
+# # New Advanced Faithfulness Metrics (ToDo; Unit tests for these)
 # factual_consistency_faithfulness = factual_consistency_faithfulness
 # hybrid_faithfulness = hybrid_faithfulness
 # contradiction_faithfulness = contradiction_faithfulness

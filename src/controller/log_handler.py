@@ -1,4 +1,4 @@
-## Python code to retrieve the agentc logs for the corresponsding 
+## Python code to retrieve the agentc logs for the corresponsding session id
 
 # Given session id, couchbase cluster url, username, password bucket name, scope name, collection name, retrieve the logs with the corresponding session id, order by "timestamp" in ascending order
 

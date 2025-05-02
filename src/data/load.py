@@ -63,7 +63,6 @@ class LoadOperator:
                 key = f"{self.dataset_id}_{doc['doc_id']}"
                 docs_to_insert[key] = doc
                 
-            # Insert the documents into the collection in batches of 100
             results = cb_coll.upsert_multi(docs_to_insert)
             exceptions = results.exceptions
             if len(exceptions) > 0:
@@ -96,7 +95,7 @@ class LoadOperator:
             for r in result.results.values():
                 content.append(r.value)
         
-        ## Create the EvalDataset object with only those fields that has a value not None
+        ## Create the EvalDataset object with only those fields that has a value `not None`
         output_dict = {}
         if content[0]["question"]:
             output_dict["questions"] = [c["question"] for c in content]
@@ -114,19 +113,12 @@ class LoadOperator:
         
         
 
-    def connect(self, collection=None):
-        # Check if the environment variable `has_cert_file` field
-        has_cert_file = os.getenv("has_cert_file") or False
-        
+    def connect(self, collection=None):        
         # If a separate collection is defined by the user, use that collection
         if collection is not None:
             self.collection = collection
         
-        # Connect to the Couchbase cluster
-        if has_cert_file:
-            auth = PasswordAuthenticator(self.username, self.password, cert_path="/root/cert.txt")
-        else:
-            auth = PasswordAuthenticator(self.username, self.password)
+        auth = PasswordAuthenticator(self.username, self.password)
             
         options = ClusterOptions(auth)
         options.apply_profile("wan_development")

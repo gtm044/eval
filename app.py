@@ -2069,7 +2069,6 @@ elif option == "Docs":
         """)
         
         # Remove the columns and display sequentially
-        st.subheader("Agent Code Example")
         st.code(
         """
         # LangGraph tracing

@@ -21,7 +21,7 @@ class ExperimentOptions(BaseModel):
     - Embedding model configuration
     - Language model selection
     
-    Users can also add custom fields as needed for their specific experiment requirements.
+    Can also add custom fields as needed for their specific experiment requirements.
     """
     experiment_id: Optional[str] = Field(
         default = str(uuid.uuid4()),

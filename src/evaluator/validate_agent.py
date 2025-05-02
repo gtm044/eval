@@ -140,11 +140,10 @@ class AgentValidationEngine:
             else:
                 avg_metrics[metric] = None
                 
-        # Create a results directory.
         results_dir = ".results"
         os.makedirs(results_dir, exist_ok=True)
         
-        # Save the results to a json file
+        # Save to json
         json_filename = os.path.join(results_dir, "results.json")
         with open(json_filename, "w") as f:
             json.dump(results_json_list, f, indent=4)

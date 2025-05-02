@@ -75,7 +75,7 @@ class ValidationEngine:
             # Create a list to track metrics to remove
             metrics_to_remove = []
             
-            # First identify all metrics to remove
+            # TO-DO: Metrics to remove, filtering out just the ragas metrics - need to make this dynamic
             for i, metric in enumerate(self.metrics):
                 if metric.name == "avg_chunk_size":
                     metrics_to_remove.append(i)
@@ -92,7 +92,6 @@ class ValidationEngine:
                 elif metric.name == "llm_grading":
                     metrics_to_remove.append(i)
                     print("Calculating llm grading...")
-                    # Extract the first string from each list in the answers list of lists
                     prime_answers = [answer_list[0] for answer_list in self.dataset.answers] if self.dataset.answers else []
                     llm_grading_result = llm_grading(queries=self.dataset.questions, ground_truths=prime_answers, model_answers=self.dataset.responses, rubrics=self.rubrics)
                     
@@ -102,7 +101,7 @@ class ValidationEngine:
             
             if len(self.temp_metrics)>0:
                 results = ragas.evaluate(dataset=golden_dataset, metrics=self.temp_metrics, show_progress=True)
-            # Fix this headache, if ragas metrics are not provided then we dont have a results object, can we create a rags result object with nothing?
+            # Fix this headache, if ragas metrics are not provided then we dont have a results object, can we create a ragas result object with nothing?
             else:
                 # Create a pandas dataframe with the same structure as the results dataframe
                 results = pd.DataFrame(columns=["user_input", "retrieved_contexts", "response", "reference"])
@@ -119,15 +118,12 @@ class ValidationEngine:
                 # Determine applicable metrics based on available dataset fields
                 applicable_metrics = []
                 
-                # Check for context-based metrics
                 if "contexts" in dataset_dict and "question" in dataset_dict and "answer" in dataset_dict:
                     applicable_metrics.extend([answer_relevancy, faithfulness])
                 
-                # Check for ground truth-based metrics
                 if "ground_truths" in dataset_dict and "answer" in dataset_dict and "question" in dataset_dict:
                     applicable_metrics.extend([answer_correctness, answer_similarity])
                 
-                # Check for reference-based metrics
                 if "question" in dataset_dict and "reference" in dataset_dict and "contexts" in dataset_dict:
                     applicable_metrics.extend([context_recall, context_precision])
                 
@@ -152,35 +148,12 @@ class ValidationEngine:
         for item, value in additional_fields.items():
             if value is not None:
                 df[item] = value
-        
-        # if self.dataset.answers is not None:
-        #     df["ground_truth_answer"] = self.dataset.answers
-        
-        # # Add the avg chunk size result to the results
-        # if avg_chunk_size_result is not None:
-        #     df["avg_chunk_size"] = avg_chunk_size_result
-        
-        # # Add the context similarity result to the results
-        # if context_similarity_result is not None:
-        #     df["context_similarity"] = context_similarity_result
-        
-        # # Add the context score result to the results
-        # if context_score_result is not None:
-        #     df["context_score"] = context_score_result
             
-        # # Add the llm grading result to the results
-        # if llm_grading_result is not None:
-        #     df["llm_grading"] = llm_grading_result
-            
-        # Create results directory if it doesn't exist
+        # Create results directory if it doesn't exist, save 
         results_dir = ".results"
         os.makedirs(results_dir, exist_ok=True)
-        
-        # Save results to CSV in the results directory
         csv_filename = os.path.join(results_dir, "results.csv")
         df.to_csv(csv_filename, index=False)
-        
-        # Convert to JSON and save in the results directory
         results_dict = df.to_dict(orient='records')
         json_filename = os.path.join(results_dir, "results.json")
         with open(json_filename, "w") as f:
@@ -194,14 +167,12 @@ class ValidationEngine:
                 "properties": {}
             }
         }
-        
-        # Add properties to schema based on columns in the DataFrame
         for column in df.columns:
             json_schema["items"]["properties"][column] = {
                 "type": "number" if df[column].dtype in ['float64', 'int64'] else "string",
             }
             
-        # For the metrics that are calculated, find the average of each metric
+        # Metircs averages
         avg_metrics = {}
         if self.metrics:
             for metric in self.metrics:

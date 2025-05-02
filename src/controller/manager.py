@@ -20,7 +20,6 @@ class Experiment:
         Args:
             options: Configuration parameters for the experiment
         """
-        # Couchbase cluster credentials
         self.bucket = os.getenv("bucket")
         self.scope = os.getenv("scope")
         self.collection = os.getenv("collection")
@@ -28,10 +27,9 @@ class Experiment:
         self.username = os.getenv("cb_username")
         self.password = os.getenv("cb_password")
         
-        # If experiment options are not provided, the class acts as a retriever
+        # Pass to retrieve function if options are not providied
         if options is None:
             return
-        
         self.options = options
         
         # Load the dataset
@@ -62,7 +60,6 @@ class Experiment:
                 rubrics=getattr(self.options, 'rubrics', None)
             )
             
-            # Run the evaluation
             self.output, self.metrics, _, self.avg_metrics = validation_engine.evaluate()
         
         # Rename the .results directory created by the the validationEngine to ".results-experiment_id"
@@ -76,8 +73,7 @@ class Experiment:
         # Metrics retrieved from the validation engine are of type ragas metric object, get their names
         self.metric_names = [metric.name for metric in self.metrics]
         
-        # Create the experiment metadata with configuration and results summary
-        # Create base metadata with standard fields
+        # Experiment metadata with configuration and results summary
         self.metadata = {
             "experiment_id": self.options.experiment_id,
             "timestamp": datetime.now().isoformat(),
@@ -94,7 +90,6 @@ class Experiment:
         }
         
         # Add custom_fields
-        # BaseModel objects don't use __dict__ directly, use model_dump()
         options_dict = self.options.model_dump()
         for field_name, field_value in options_dict.items():
             if (field_name not in self.metadata and 
@@ -123,7 +118,7 @@ class Experiment:
         Args:
             collection: Optional custom collection name to use instead of default
         """
-        # If a separate collection is defined by the user, use that collection
+        # Handle user defined collection
         if collection is not None:
             self.collection = collection
             
@@ -146,7 +141,6 @@ class Experiment:
             if len(results.exceptions) > 0:
                 batch_exceptions.append(results.exceptions)
         
-        # Raise exception if any batch upload failed
         if len(batch_exceptions) > 0:
             raise Exception(batch_exceptions)
         else:
@@ -168,12 +162,11 @@ class Experiment:
             self.collection = collection
         content = []
         
-        # Get the connection to couchbase cluster
         load_operator = LoadOperator()
         cb = load_operator.connect(collection=self.collection)
         cb_coll = cb.scope(self.scope).collection(self.collection)
         
-        # Create a prefix scan using the experiment id
+        # Prefix scan with experiment_id
         prefix = f"{experiment_id}_"
         experiment_docs = cb_coll.scan(PrefixScan(prefix))
         for doc in experiment_docs:
@@ -183,7 +176,6 @@ class Experiment:
         
         # Save the results as JSON, CSV and metadata
         with open(result_json_path, "w") as f:
-            # Remove metadata from each item before saving
             content_without_metadata = []
             for item in content:
                 item_copy = item.copy()
@@ -204,6 +196,7 @@ class Experiment:
                 json.dump(content[0]["metadata"], f, indent=4)
         
         print(f"Retrieved experiment data saved to {results_dir}")    
+    
     
 if __name__=='__main__':
     from src.evaluator.metrics import faithfulness, context_precision
@@ -236,10 +229,9 @@ if __name__=='__main__':
     experiment = Experiment(options=options)
     experiment.load_to_couchbase(collection="experiment2")
     
-    # # Test retrieve functionality
+    # Test retrieve functionality
     experiment = Experiment()
     print("Testing retrieve functionality...")
     experiment.retrieve(experiment_id="123", collection="experiment2")
-    
     print("Retrieved experiment data saved to .results-123 directory")
      
