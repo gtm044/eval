@@ -5,7 +5,7 @@ import json
 import time
 from dotenv import load_dotenv
 from src.data.dataset import EvalDataset
-from src.data.generator import SyntheticDataGenerator
+from src.data.generator import SyntheticDataGenerator, init_generator
 from src.controller.options import ExperimentOptions
 from src.controller.manager import Experiment
 from src.evaluator.metrics import (
@@ -100,6 +100,25 @@ if option == "Generate Data":
     if 'generated_dataset' not in st.session_state:
         st.session_state.generated_dataset = None
     
+    # Add generation type selection
+    generation_type = st.radio(
+        "Select generation method:",
+        ["Single-hop (faster, simpler)", "Multi-hop (complex, multi-document reasoning)"],
+        help="Single-hop generates QA pairs from individual documents. Multi-hop generates QA pairs that require reasoning across multiple documents."
+    )
+    
+    # Set multi_hop flag based on selection
+    multi_hop = generation_type == "Multi-hop (complex, multi-document reasoning)"
+    
+    # Add information about the generation types
+    st.info("""
+    **About Generation Methods:**
+    
+    - **Single-hop generation** creates questions that can be answered from a single document. This is faster and works well for most use cases.
+    
+    - **Multi-hop generation** creates more complex questions that require reasoning across multiple documents. The system will automatically cluster related documents to create questions that need information from multiple sources.
+    """)
+    
     # Input tabs
     tab1, tab2 = st.tabs(["From CSV/JSON", "From Raw Text"])
     
@@ -154,21 +173,11 @@ if option == "Generate Data":
                 help="Maximum word count for each answer"
             )
             
-            # include_citations = st.checkbox(
-            #     "Include citations",
-            #     help="Whether to include citations to specific parts of the document"
-            # )
-            
             additional_instructions = st.text_area(
                 "Additional instructions",
                 placeholder="Any additional instructions for answer generation"
             )
             
-            # a_custom_instructions = st.text_area(
-            #     "Custom instructions for answer generation",
-            #     placeholder="Enter custom instructions to override the default answer generation behavior"
-            # )
-        
         if uploaded_file is not None:
             if st.button("Generate Data", key="generate_csv_json"):
                 try:
@@ -180,8 +189,8 @@ if option == "Generate Data":
                     with open("temp_metadata.txt", "w") as f:
                         f.write(metadata)
                     
-                    # Initialize the generator
-                    generator = SyntheticDataGenerator()
+                    # Initialize the generator based on user selection
+                    generator = init_generator(multi_hop=multi_hop)
                     
                     with st.spinner("Generating synthetic data..."):
                         start_time = time.time()
@@ -190,45 +199,104 @@ if option == "Generate Data":
                             df = df[:limit]
                             temp_path = "temp_cleaned_upload.csv"
                             df.to_csv(temp_path, index=False)   
-                            generated_data = generator.synthesize_from_csv(
-                                path=temp_path,
-                                metadata=metadata,
-                                # Question generation parameters
-                                question_custom_instructions=q_custom_instructions if q_custom_instructions else None,
-                                example_questions=example_questions,
-                                # Answer generation parameters
-                                answer_style=answer_style if answer_style else None,
-                                answer_format=answer_format if answer_format else None,
-                                tone=tone if tone else None,
-                                max_length=max_length,
-                                # include_citations=include_citations,
-                                additional_instructions=additional_instructions if additional_instructions else None,
-                                # answer_custom_instructions=a_custom_instructions if a_custom_instructions else None
-                            )
+                            
+                            if multi_hop:
+                                # Use multi-hop generator
+                                generated_data = generator.synthesize_from_csv(
+                                    csv_path=temp_path,
+                                    metadata=metadata,
+                                    limit=limit,
+                                    # Answer generation parameters
+                                    answer_style=answer_style if answer_style else None,
+                                    answer_format=answer_format if answer_format else None,
+                                    tone=tone if tone else None,
+                                    max_length=max_length,
+                                    additional_instructions=additional_instructions if additional_instructions else None,
+                                    custom_instructions=None,
+                                )
+                                # Convert to format expected by the app
+                                questions = []
+                                answers = []
+                                reference_contexts = []
+                                for item in generated_data:
+                                    questions.append(item["question"])
+                                    answers.append(item["answer"])
+                                    reference_contexts.append(item["reference"])
+                                
+                                generated_data = {
+                                    "questions": questions,
+                                    "answers": answers,
+                                    "reference_contexts": reference_contexts
+                                }
+                            else:
+                                # Use single-hop generator
+                                generated_data = generator.synthesize_from_csv(
+                                    path=temp_path,
+                                    metadata=metadata,
+                                    # Question generation parameters
+                                    question_custom_instructions=q_custom_instructions if q_custom_instructions else None,
+                                    example_questions=example_questions,
+                                    # Answer generation parameters
+                                    answer_style=answer_style if answer_style else None,
+                                    answer_format=answer_format if answer_format else None,
+                                    tone=tone if tone else None,
+                                    max_length=max_length,
+                                    additional_instructions=additional_instructions if additional_instructions else None,
+                                )
                             os.remove(temp_path)
                         else:  # json
                             field_param = field if field else None
-                            documents = generator.load_from_json(
-                                path="temp_upload.json",
-                                field=field_param
-                            )
-                            # Limit the number of documents
-                            documents = documents[:limit]
-                            generated_data = generator.synthesize_from_text(
-                                documents=documents,
-                                metadata=metadata,
-                                # Question generation parameters
-                                question_custom_instructions=q_custom_instructions if q_custom_instructions else None,
-                                example_questions=example_questions,
-                                # Answer generation parameters
-                                answer_style=answer_style if answer_style else None,
-                                answer_format=answer_format if answer_format else None,
-                                tone=tone if tone else None,
-                                max_length=max_length,
-                                # include_citations=include_citations,
-                                additional_instructions=additional_instructions if additional_instructions else None,
-                                # answer_custom_instructions=a_custom_instructions if a_custom_instructions else None
-                            )
+                            
+                            if multi_hop:
+                                # Use multi-hop generator
+                                generated_data = generator.synthesize_from_json(
+                                    json_path="temp_upload.json",
+                                    field=field_param,
+                                    limit=limit,
+                                    metadata=metadata,
+                                    # Answer generation parameters
+                                    answer_style=answer_style if answer_style else None,
+                                    answer_format=answer_format if answer_format else None,
+                                    tone=tone if tone else None,
+                                    max_length=max_length,
+                                    additional_instructions=additional_instructions if additional_instructions else None,
+                                    custom_instructions=None,
+                                )
+                                # Convert to format expected by the app
+                                questions = []
+                                answers = []
+                                reference_contexts = []
+                                for item in generated_data:
+                                    questions.append(item["question"])
+                                    answers.append(item["answer"])
+                                    reference_contexts.append(item["reference"])
+                                
+                                generated_data = {
+                                    "questions": questions,
+                                    "answers": answers,
+                                    "reference_contexts": reference_contexts
+                                }
+                            else:
+                                # Single-hop: Load documents and use the single-hop generator
+                                documents = generator.load_from_json(
+                                    path="temp_upload.json",
+                                    field=field_param
+                                )
+                                # Limit the number of documents
+                                documents = documents[:limit]
+                                generated_data = generator.synthesize_from_text(
+                                    documents=documents,
+                                    metadata=metadata,
+                                    # Question generation parameters
+                                    question_custom_instructions=q_custom_instructions if q_custom_instructions else None,
+                                    example_questions=example_questions,
+                                    # Answer generation parameters
+                                    answer_style=answer_style if answer_style else None,
+                                    answer_format=answer_format if answer_format else None,
+                                    tone=tone if tone else None,
+                                    max_length=max_length,
+                                    additional_instructions=additional_instructions if additional_instructions else None,
+                                )
                         generation_time = time.time() - start_time
                     
                     # Store generated data in session state
@@ -362,26 +430,57 @@ if option == "Generate Data":
                 # Parse input into documents
                 documents = [doc.strip() for doc in raw_text.split("\n") if doc.strip()]
                 
-                # Initialize the generator
-                generator = SyntheticDataGenerator()
+                # Initialize the generator based on user selection
+                generator = init_generator(multi_hop=multi_hop)
                 
                 with st.spinner("Generating synthetic data..."):
                     start_time = time.time()
-                    generated_data = generator.synthesize_from_text(
-                        documents=documents,
-                        metadata=metadata,
-                        # Question generation parameters
-                        question_custom_instructions=q_custom_instructions_raw if q_custom_instructions_raw else None,
-                        example_questions=example_questions_raw,
-                        # Answer generation parameters
-                        answer_style=answer_style_raw if answer_style_raw else None,
-                        answer_format=answer_format_raw if answer_format_raw else None,
-                        tone=tone_raw if tone_raw else None,
-                        max_length=max_length_raw,
-                        include_citations=include_citations_raw,
-                        additional_instructions=additional_instructions_raw if additional_instructions_raw else None,
-                        answer_custom_instructions=a_custom_instructions_raw if a_custom_instructions_raw else None
-                    )
+                    
+                    if multi_hop:
+                        # Use multi-hop generator
+                        generated_data = generator.synthesize_from_text(
+                            texts=documents,
+                            metadata=metadata,
+                            # Answer generation parameters
+                            answer_style=answer_style_raw if answer_style_raw else None,
+                            answer_format=answer_format_raw if answer_format_raw else None,
+                            tone=tone_raw if tone_raw else None,
+                            max_length=max_length_raw,
+                            include_citations=include_citations_raw,
+                            additional_instructions=additional_instructions_raw if additional_instructions_raw else None,
+                            custom_instructions=a_custom_instructions_raw if a_custom_instructions_raw else None
+                        )
+                        # Convert to format expected by the app
+                        questions = []
+                        answers = []
+                        reference_contexts = []
+                        for item in generated_data:
+                            questions.append(item["question"])
+                            answers.append(item["answer"])
+                            reference_contexts.append(item["reference"])
+                        
+                        generated_data = {
+                            "questions": questions,
+                            "answers": answers,
+                            "reference_contexts": reference_contexts
+                        }
+                    else:
+                        # Use single-hop generator
+                        generated_data = generator.synthesize_from_text(
+                            documents=documents,
+                            metadata=metadata,
+                            # Question generation parameters
+                            question_custom_instructions=q_custom_instructions_raw if q_custom_instructions_raw else None,
+                            example_questions=example_questions_raw,
+                            # Answer generation parameters
+                            answer_style=answer_style_raw if answer_style_raw else None,
+                            answer_format=answer_format_raw if answer_format_raw else None,
+                            tone=tone_raw if tone_raw else None,
+                            max_length=max_length_raw,
+                            include_citations=include_citations_raw,
+                            additional_instructions=additional_instructions_raw if additional_instructions_raw else None,
+                            answer_custom_instructions=a_custom_instructions_raw if a_custom_instructions_raw else None
+                        )
                     generation_time = time.time() - start_time
                 
                 # Store generated data in session state
@@ -1881,7 +1980,7 @@ elif option == "Docs":
     # Quick Start Guide
     st.header("Quick Start Guide")
     
-    quick_start_tabs = st.tabs(["Synthetic Data Generation", "Basic Evaluation", "Experiment-based Evaluation"])
+    quick_start_tabs = st.tabs(["Synthetic Data Generation", "Basic Evaluation", "Experiment-based Evaluation", "Agent Evaluation"])
     
     with quick_start_tabs[0]:
         st.markdown("""
@@ -1962,6 +2061,155 @@ elif option == "Docs":
         """)
         
         st.markdown("**Or use the 'Experiment' option in the sidebar for the UI version.**")
+    
+    with quick_start_tabs[3]:
+        st.markdown("### Agent Evaluation")
+        st.markdown("""
+        The framework provides tools to trace and evaluate LangGraph and LangChain agents.
+        """)
+        
+        # Remove the columns and display sequentially
+        st.subheader("Agent Code Example")
+        st.code(
+        """
+        # LangGraph tracing
+        from eval.src.langgraph.trace_v2 import create_traced_agent, log_traces
+        from langchain_core.messages import HumanMessage
+
+        # Create your LangGraph agent
+        # ... your agent implementation ...
+        react_graph = builder.compile()
+
+        # Create a traced version of the agent
+        traced_graph = create_traced_agent(react_graph)
+
+        def get_agent_response_wrapped(queries):
+            # Use the TracedAgent wrapper to automatically trace all interactions
+            results = []
+            for query in queries:
+                messages = [HumanMessage(content=query)]
+                result = traced_graph.stream({"messages": messages})
+                results.append(list(result))  
+            
+            log_path = log_traces()
+            print(f"Traces saved to: {log_path}")
+            
+            return results
+
+        # Example usage
+        get_agent_response_wrapped(["What is the price of copper?", "What is the price of gold?"])
+
+        from src.data.dataset import EvalDataset
+        from src.controller.options import ExperimentOptions
+        from src.controller.manager import Experiment
+
+        reference_tool_calls = [
+            [{"name": "get_metal_price", "args": {"metal_name": "copper"}}],
+            [{"name": "get_metal_price", "args": {"metal_name": "gold"}}]
+        ]
+
+        gt_answers = [
+            "The current price of copper is $0.0098 per gram.",
+            "The current price of gold is $88.16 per gram."
+        ]
+
+        gt_tool_outputs = [
+            ["0.0098"],
+            ["88.1553"]
+        ]
+
+        gt_dataset = EvalDataset(
+            reference_tool_calls=reference_tool_calls,
+            gt_answers=gt_answers,
+            gt_tool_outputs=gt_tool_outputs
+        )
+
+        experiment_options = ExperimentOptions(
+            experiment_id="improved_test",
+            langgraph=True
+        )
+
+        experiment = Experiment(dataset=gt_dataset, options=experiment_options)
+        """
+        )
+        
+        st.subheader("Example Output")
+        st.code(
+        """
+[
+    {
+        "human_message": "What is the price of copper?",
+        "tool_calls": [
+            {
+                "name": "get_metal_price",
+                "args": {
+                    "metal_name": "copper"
+                }
+            }
+        ],
+        "ai_messages": [
+            "",
+            "The current price of copper is $0.0098 per gram."
+        ],
+        "tool_outputs": [
+            "0.0098"
+        ],
+        "ground_truth_answer": "The current price of copper is $0.0098 per gram.",
+        "ground_truth_tool_outputs": [
+            "0.0098"
+        ],
+        "reference_tool_calls": [
+            {
+                "name": "get_metal_price",
+                "args": {
+                    "metal_name": "copper"
+                }
+            }
+        ],
+        "tool_call_accuracy": 1.0,
+        "answer_correctness": 1.0,
+        "answer_faithfulness": 3,
+        "tool_accuracy": 1.0
+    },
+    {
+        "human_message": "What is the price of gold?",
+        "tool_calls": [
+            {
+                "name": "get_metal_price",
+                "args": {
+                    "metal_name": "gold"
+                }
+            }
+        ],
+        "ai_messages": [
+            "",
+            "The current price of gold is $88.16 per gram."
+        ],
+        "tool_outputs": [
+            "88.1553"
+        ],
+        "ground_truth_answer": "The current price of gold is $88.16 per gram.",
+        "ground_truth_tool_outputs": [
+            "88.1553"
+        ],
+        "reference_tool_calls": [
+            {
+                "name": "get_metal_price",
+                "args": {
+                    "metal_name": "gold"
+                }
+            }
+        ],
+        "tool_call_accuracy": 1.0,
+        "answer_correctness": 1.0,
+        "answer_faithfulness": 3,
+        "tool_accuracy": 1.0
+    }
+]
+        """
+        )
+
+        st.markdown("**See examples/agent_langgraph_improved.py for a complete example.**")
     
     # Roadmap section
     st.header("Roadmap")

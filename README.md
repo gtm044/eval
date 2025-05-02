@@ -216,19 +216,30 @@ Example provided in [`agentic_evaluation`](examples/agent_langgraph.py)
 
 ```python
 # LangGraph tracing
-from eval.src.langgraph.trace import track_variable, log_lang_stream
+from eval.src.langgraph.trace_v2 import create_traced_agent, log_traces
 
-@track_variable("stream") # Provide the variable that stores the result of the .stream function call
-def run_agent(query):
-    # Your LangGraph agent implementation
-    # ...
-    return stream
+# Create your LangGraph agent
+# ... your agent implementation ...
+react_graph = builder.compile()
 
-# Run the agent
-run_agent("What is the price of copper?")
+# Create a traced version of the agent
+traced_graph = create_traced_agent(react_graph)
 
-# Save the logs
-log_lang_stream()
+def get_agent_response_wrapped(queries):
+    """Use the TracedAgent wrapper to automatically trace all interactions"""
+    results = []
+    for query in queries:
+        messages = [HumanMessage(content=query)]
+        result = traced_graph.stream({"messages": messages})
+        results.append(list(result))  
+    
+    log_path = log_traces()
+    print(f"Traces saved to: {log_path}")
+    
+    return results
+
+# Example usage
+get_agent_response_wrapped(["What is the price of copper?", "What is the price of gold?"])
 
 # LangChain tracing
 from eval.src.langchain.trace import interceptor
@@ -238,7 +249,6 @@ agent = Agent(..., callbacks=[interceptor])
 
 # Run the agent
 agent.invoke({"input": "What is the price of gold?"})
-
 # Save the logs
 interceptor.log()
 ```

@@ -133,16 +133,10 @@ def get_agent_response_wrapped(queries):
     """Use the TracedAgent wrapper to automatically trace all interactions"""
     results = []
     for query in queries:
-        # Create the message format expected by the agent
         messages = [HumanMessage(content=query)]
-        
-        # Use the traced agent (stream or invoke both work)
         result = traced_graph.stream({"messages": messages})
-        
-        # Store the result for return (optional)
-        results.append(list(result))  # Consume the generator
+        results.append(list(result))  
     
-    # Log all the traces
     log_path = log_traces()
     print(f"Traces saved to: {log_path}")
     
@@ -150,58 +144,6 @@ def get_agent_response_wrapped(queries):
 
 # Example usage
 get_agent_response_wrapped(["What is the price of copper?", "What is the price of gold?"])
-
-
-# METHOD 2: Using the TraceContext
-# ----------------------
-
-# def get_agent_response_context(queries):
-#     """Use context managers to explicitly trace each conversation"""
-#     results = []
-    
-#     for query in queries:
-#         # Create a trace context for this query
-#         with TraceContext(query) as ctx:
-#             # Build the message format from the context
-#             messages = [HumanMessage(content=query)]
-            
-#             # Use the original agent
-#             result = react_graph.stream({"messages": messages})
-            
-#             # Process and store the result
-#             collected_steps = list(result)  # Consume the generator
-#             results.append(collected_steps)
-    
-#     # Log all the traces
-#     log_path = log_traces()
-#     print(f"Traces saved to: {log_path}")
-    
-#     return results
-
-# # Example usage
-# get_agent_response_context(["What is the price of platinum?", "What is the price of silver?"])
-
-
-# METHOD 3: Backwards compatibility with decorators
-# ----------------------
-
-# from src.langgraph.trace_improved import trace_call
-
-# @trace_call
-# def get_agent_response_decorator(query):
-#     """Use decorator approach for simpler functions"""
-#     messages = [HumanMessage(content=query)]
-#     return list(react_graph.stream({"messages": messages}))
-
-# # Example usage - call once per query
-# get_agent_response_decorator("What is the price of palladium?")
-# get_agent_response_decorator("What is the price of aluminum?")
-
-# # Log the traced results
-# log_path = log_traces()
-# print(f"Traces saved to: {log_path}")
-
-
 
 from src.data.dataset import EvalDataset
 from src.controller.options import ExperimentOptions
