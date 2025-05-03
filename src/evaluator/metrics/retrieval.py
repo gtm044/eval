@@ -33,6 +33,7 @@ def context_similarity(reference_contexts, retrieved_contexts, method="cosine"):
             similarities.append(round(similarity.item(), 2))
     return similarities
 
+
 def context_score(reference_contexts, retrieved_contexts):
     """
     Calculates context precision, recall , f1 score between the reference and retrieved contexts.

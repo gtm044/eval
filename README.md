@@ -5,12 +5,9 @@ A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) an
 ## Overview
 
 This framework provides tools and metrics to evaluate RAG/AI systems across three key components:
-- Chunking evaluation
 - Retrieval evaluation
 - Generation evaluation
-- Agentic evaluation
-
-The framework integrates with RAGAS, a popular RAG evaluation library, and provides a structured approach for experiment management, storage and result persistence. It also supports tracing and evaluating agentic pipelines built with LangChain and LangGraph.
+- Agentic workflow evaluation
 
 <!-- ## Features
 
@@ -77,7 +74,7 @@ A complete workflow example provided in [`example.ipynb`](examples/rag_eval.ipyn
 
 The framework provides tools to generate synthetic question-answer pairs from your documents, which can be used as ground truth for evaluation. <span style="color:yellow">For json and csv documents, provide detailed metadata including the dataset schema for accurate data generation.</span>
 
-For generation and perf logging (memory and runtime):
+For generation and perf logging for the single-hop generator (memory and runtime):
 ~~~sh
 ~$ python3 -m src.data.generator --path <path to the csv/json file> --metadata-file <path to metadata txt file> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format ('csv' or 'json')>
 ~~~
@@ -168,7 +165,7 @@ dataset = EvalDataset(
     retrieved_contexts=[["RAG: retrieval-augmented generation"]]
 )
 
-# Run evaluation with RAGAS metrics
+# Run evaluation with metrics (can also provide RAGAS metrics)
 from eval.src.evaluator.metrics import context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size
 
 engine = ValidationEngine(
@@ -218,7 +215,7 @@ Example provided in [`agent_langgraph_improved.py`](examples/agent_langgraph_imp
 # LangGraph tracing
 from eval.src.langgraph.trace_v2 import create_traced_agent, log_traces
 
-# ... your agent implementation ...
+# <agent implementation>
 react_graph = builder.compile()
 
 # Create a traced version of the agent
@@ -240,15 +237,11 @@ def get_agent_response_wrapped(queries):
 # Example usage
 get_agent_response_wrapped(["What is the price of copper?", "What is the price of gold?"])
 
-# LangChain tracing
+# LangChain tracing (for RAG systems)
 from eval.src.langchain.trace import interceptor
 
-# Create a LangChain agent with the interceptor
 agent = Agent(..., callbacks=[interceptor])
-
-# Run the agent
 agent.invoke({"input": "What is the price of gold?"})
-# Save the logs
 interceptor.log()
 ```
 

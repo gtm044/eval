@@ -215,4 +215,10 @@ if __name__ == "__main__":
     csv_path = "/Users/goutham.krishnan/Documents/Work/eval/input_data/airbnb.csv"
     # generator.synthesize_from_csv(csv_path, limit=50, output_path="airbnb_synthetic_data2.json", answer_style="detailed", answer_format="json", tone="formal", max_length=100, include_citations=False, additional_instructions="Use the references to support your answer.", custom_instructions="Ensure the answer is concise and to the point.")
     
-    generator.synthesize_from_csv(csv_path, limit=20, output_path="new_prompt.json", agent_prompt="You are a helpful assistant that answers questions about the data in a funny manner. Include puns and jokes in your answers. The answer should not be too long, keep it concise.")
+    generator.synthesize_from_csv(csv_path, limit=100, output_path="new_prompt.json", agent_prompt="You are a helpful assistant that answers questions about the data in a funny manner. Include puns and jokes in your answers. The answer should not be too long, keep it concise.")
+    
+    ## Perf
+    # 100 documents - 15-18 documents
+    
+    # The time for each document increases with the number of documents (100 documents took 5m31s)
+    # The relation extraction is about 8s/doc for a total of 100docs

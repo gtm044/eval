@@ -109,6 +109,7 @@ class AgentValidationEngine:
         results["answer_faithfulness"] = answer_faithfulness(self.prepped_data["ai_messages"], self.prepped_data["tool_outputs"])
         
         # Tool Correctness - Check if the tool called is relevant to the user question
+        # to-do: Need to find a better way to calculate this
         # results["tool_correctness"] = tool_correctness(self.prepped_data["human_messages"], self.prepped_data["tool_calls"])
         
         # Tool Accuracy - Compare tool outputs with ground truth tool outputs

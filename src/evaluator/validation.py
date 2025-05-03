@@ -215,9 +215,3 @@ if __name__=='__main__':
     ## Note: The avg_chunk_size will be the same for all data points as it is a normalized index. 
     ## Ranges from -inf to 1 (Higher is better)
     ## Any score above 0.5 is acceptable.
-    
-    # How to let users add their own metrics?
-    # 1. Let users define a function according to a predefined schema
-    # 2. Add the function to the metrics list
-    # 3. Provide a decorator to the function so that it can be used as a metrics
-    # 4. Add the function to @src.evaluator.metrics.definitions
