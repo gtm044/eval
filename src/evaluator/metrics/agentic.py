@@ -136,7 +136,6 @@ def agent_response_correctness(agent_responses: List[List[Any]], gt_agent_respon
     return conversation_scores
     
 
-
 def answer_faithfulness(ai_messages: List[List[Any]], tool_outputs: List[List[str]]) -> float:
     """Calculate answer faithfulness.
     Args:
