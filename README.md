@@ -1,4 +1,4 @@
-# RAG Evaluation Framework
+# Agent Evaluation Framework
 
 A comprehensive framework for evaluating Retrieval-Augmented Generation (RAG) and Agentic systems using RAGAS and synthesizing ground truth data from raw documents.
 
