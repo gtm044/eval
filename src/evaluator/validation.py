@@ -54,32 +54,24 @@ class ValidationEngine:
         """
         Prepare a format suitable for both RAGAS and custom metrics.
         """
-        dataset_dict = {}
-        
-        if self.dataset.questions is not None:
-            dataset_dict["question"] = self.dataset.questions
-        if self.dataset.responses is not None:
-            dataset_dict["answer"] = self.dataset.responses
-        if self.dataset.retrieved_contexts is not None:
-            dataset_dict["contexts"] = self.dataset.retrieved_contexts
-        if self.dataset.answers is not None:
-            dataset_dict["ground_truths"] = self.dataset.answers
-        if self.dataset.reference_contexts is not None:
-            dataset_dict["reference"] = self.dataset.reference_contexts
-        if self.dataset.agent_responses is not None:
-            dataset_dict["agent_responses"] = self.dataset.agent_responses
-        if self.dataset.agent_tool_calls is not None:
-            dataset_dict["agent_tool_calls"] = self.dataset.agent_tool_calls
-        if self.dataset.agent_tool_outputs is not None:
-            dataset_dict["agent_tool_outputs"] = self.dataset.agent_tool_outputs
-        if self.dataset.reference_tool_calls is not None:
-            dataset_dict["reference_tool_calls"] = self.dataset.reference_tool_calls
-        if self.dataset.gt_answers is not None:
-            dataset_dict["gt_answers"] = self.dataset.gt_answers
-        if self.dataset.gt_tool_outputs is not None:
-            dataset_dict["gt_tool_outputs"] = self.dataset.gt_tool_outputs
-            
+        # Define all possible dataset attributes to include
+        dataset_fields = {
+            "question": self.dataset.questions,
+            "answer": self.dataset.responses,
+            "contexts": self.dataset.retrieved_contexts,
+            "ground_truths": self.dataset.answers,
+            "reference": self.dataset.reference_contexts,
+            "agent_responses": self.dataset.agent_responses,
+            "agent_tool_calls": self.dataset.agent_tool_calls,
+            "agent_tool_outputs": self.dataset.agent_tool_outputs,
+            "reference_tool_calls": self.dataset.reference_tool_calls,
+            "gt_answers": self.dataset.gt_answers,
+            "gt_tool_outputs": self.dataset.gt_tool_outputs
+        }
+        # Only include non-None fields
+        dataset_dict = {k: v for k, v in dataset_fields.items() if v is not None}
         golden_dataset = Dataset.from_dict(dataset_dict)
+        
         return golden_dataset, dataset_dict
     
     
@@ -97,26 +89,30 @@ class ValidationEngine:
                 sig = inspect.signature(metric)
                 param_names = list(sig.parameters.keys())
                 
-                # Mapping the params to our attributes in the evaluation datset
-                kwargs = {}
+                # Define parameter mapping with all possible dataset attributes
                 param_mapping = {
+                    # Questions/queries
                     "questions": self.dataset.questions,
                     "queries": self.dataset.questions,
+                    # Contexts
                     "reference_contexts": self.dataset.reference_contexts,
                     "retrieved_contexts": self.dataset.retrieved_contexts,
                     "contexts": self.dataset.retrieved_contexts,
+                    # Responses/answers
                     "responses": self.dataset.responses,
                     "model_answers": self.dataset.responses,
                     "answer": self.dataset.responses,
                     "ground_truths": self.dataset.answers,
                     "answers": self.dataset.answers,
-                    "rubrics": self.rubrics,
+                    # Tool-related fields
                     "agent_responses": self.dataset.agent_responses,
                     "agent_tool_calls": self.dataset.agent_tool_calls,
                     "agent_tool_outputs": self.dataset.agent_tool_outputs,
                     "reference_tool_calls": self.dataset.reference_tool_calls,
                     "gt_answers": self.dataset.gt_answers,
-                    "gt_tool_outputs": self.dataset.gt_tool_outputs
+                    "gt_tool_outputs": self.dataset.gt_tool_outputs,
+                    # Other
+                    "rubrics": self.rubrics
                 }
                 
                 # For llm grading, we need the first answer from each list, 
@@ -124,9 +120,13 @@ class ValidationEngine:
                 if metric.__name__ == "llm_grading" and self.dataset.answers:
                     param_mapping["ground_truths"] = [answer_list[0] for answer_list in self.dataset.answers] if self.dataset.answers else []
 
-                for param in param_names:
-                    if param in param_mapping and param_mapping[param] is not None:
-                        kwargs[param] = param_mapping[param]
+                # Build kwargs based on function parameters
+                kwargs = {
+                    param: param_mapping[param]
+                    for param in param_names
+                    if param in param_mapping and param_mapping[param] is not None
+                }
+                
                 metric_name = metric.name if hasattr(metric, 'name') else metric.__name__
                 print(f"Calculating {metric_name}...")
                 
@@ -135,7 +135,7 @@ class ValidationEngine:
                 return metric_name, result
             except Exception as e:
                 print(f"Error calculating {getattr(metric, 'name', metric.__name__)}: {e}")
-                
+        
         return None, None
     
     
@@ -164,28 +164,30 @@ class ValidationEngine:
         Returns:
             pandas.DataFrame: Empty dataframe with appropriate columns
         """
-        df = pd.DataFrame(columns=["user_input", "retrieved_contexts", "response", "reference"])
-        if self.dataset.questions:
-            df["user_input"] = self.dataset.questions
-        if self.dataset.retrieved_contexts:
-            df["retrieved_contexts"] = self.dataset.retrieved_contexts
-        if self.dataset.responses:
-            df["response"] = self.dataset.responses
-        if self.dataset.reference_contexts:
-            df["reference"] = self.dataset.reference_contexts
-        if self.dataset.agent_responses:
-            df["agent_responses"] = self.dataset.agent_responses
-        if self.dataset.agent_tool_calls:
-            df["agent_tool_calls"] = self.dataset.agent_tool_calls
-        if self.dataset.agent_tool_outputs:
-            df["agent_tool_outputs"] = self.dataset.agent_tool_outputs
-        if self.dataset.reference_tool_calls:
-            df["reference_tool_calls"] = self.dataset.reference_tool_calls
-        if self.dataset.gt_answers:
-            df["gt_answers"] = self.dataset.gt_answers
-        if self.dataset.gt_tool_outputs:
-            df["gt_tool_outputs"] = self.dataset.gt_tool_outputs
-            
+        # Define all possible dataset fields
+        fields = {
+            "user_input": self.dataset.questions,
+            "retrieved_contexts": self.dataset.retrieved_contexts,
+            "response": self.dataset.responses,
+            "reference": self.dataset.reference_contexts,
+            "agent_responses": self.dataset.agent_responses,
+            "agent_tool_calls": self.dataset.agent_tool_calls,
+            "agent_tool_outputs": self.dataset.agent_tool_outputs,
+            "reference_tool_calls": self.dataset.reference_tool_calls,
+            "gt_answers": self.dataset.gt_answers,
+            "gt_tool_outputs": self.dataset.gt_tool_outputs
+        }
+        
+        # Number of rows required -> len of the longest list
+        num_rows = max([len(v) for v in fields.values() if v is not None] or [1])
+        df = pd.DataFrame(index=range(num_rows))
+        # Id data - data else None
+        for col_name, data in fields.items():
+            if data is not None:
+                df[col_name] = data
+            else:
+                df[col_name] = [None] * num_rows
+        
         return df
     
     
@@ -329,69 +331,70 @@ class ValidationEngine:
         
 if __name__=='__main__':
     # Example
-    # data = {
-    #     "questions": ["What is the capital of France?", "Who is the president of the USA?"],
-    #     "answers": [["Paris", "France"], ["Joe Biden", "USA"]],
-    #     "responses": ["Capital of france is Paris", "President of the USA is Joe Biden"],
-    #     "reference_contexts": ["Paris is the capital of France", "Joe Biden is the 46th president of the USA"],
-    #     "retrieved_contexts": [["Paris is the capital of France", "France is in Europe"], ["Joe Biden is the 46th president of the USA", "The USA is a country in North America"]]
-    # }
-    # _dataset = EvalDataset(**data)
+    data = {
+        "questions": ["What is the capital of France?", "Who is the president of the USA?"],
+        "answers": [["Paris", "France"], ["Joe Biden", "USA"]],
+        "responses": ["Capital of france is Paris", "President of the USA is Joe Biden"],
+        "reference_contexts": ["Paris is the capital of France", "Joe Biden is the 46th president of the USA"],
+        "retrieved_contexts": [["Paris is the capital of France", "France is in Europe"], ["Joe Biden is the 46th president of the USA", "The USA is a country in North America"]]
+    }
+    _dataset = EvalDataset(**data)
     
-    # # Define custom metric functions
-    # def response_length(responses):
-    #     """
-    #     Custom metric that calculates the length of each response
-    #     """
-    #     print("Calculating response length...")
-    #     response_lengths = [len(response) for response in responses]
-    #     return response_lengths
+    # Define custom metric functions
+    def response_length(responses):
+        """
+        Custom metric that calculates the length of each response
+        """
+        print("Calculating response length...")
+        response_lengths = [len(response) for response in responses]
+        return response_lengths
     
-    # def context_to_response_ratio(responses, retrieved_contexts):
-    #     """
-    #     Custom metric that calculates the ratio of context length to response length
-    #     """
-    #     print("Calculating context to response ratio...")
-    #     ratios = []
-    #     for i, response in enumerate(responses):
-    #         if i < len(retrieved_contexts):
-    #             # Calculate total length of all contexts for this response
-    #             total_context_length = sum(len(ctx) for ctx in retrieved_contexts[i])
-    #             response_length = len(response)
-    #             ratio = total_context_length / response_length if response_length > 0 else 0
-    #             ratios.append(ratio)
-    #         else:
-    #             ratios.append(0)
-    #     return ratios
+    def context_to_response_ratio(responses, retrieved_contexts):
+        """
+        Custom metric that calculates the ratio of context length to response length
+        """
+        print("Calculating context to response ratio...")
+        ratios = []
+        for i, response in enumerate(responses):
+            if i < len(retrieved_contexts):
+                # Calculate total length of all contexts for this response
+                total_context_length = sum(len(ctx) for ctx in retrieved_contexts[i])
+                response_length = len(response)
+                ratio = total_context_length / response_length if response_length > 0 else 0
+                ratios.append(ratio)
+            else:
+                ratios.append(0)
+        return ratios
 
     
-    # metrics = [
-    #     # Custom metrics
-    #     response_length,
-    #     context_to_response_ratio,
-    #     # System-implemented metrics that work reliably (not RAGAS metrics)
-    #     context_similarity,
-    #     context_score,
-    #     # Ragas metrics
-    #     answer_correctness,
-    #     answer_similarity,
-    #     answer_relevancy,
-    # ]
+    metrics = [
+        # Custom metrics
+        response_length,
+        context_to_response_ratio,
+        # System-implemented metrics that work reliably (not RAGAS metrics)
+        context_similarity,
+        context_score,
+        # Ragas metrics
+        answer_correctness,
+        answer_similarity,
+        answer_relevancy,
+    ]
     
-    # # Create the validation engine with the metrics
-    # eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics)
+    # Create the validation engine with the metrics
+    eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics)
     
-    # # Run the evaluation
-    # results, used_metrics, schema, avg_metrics = eval_engine.evaluate()
+    # Run the evaluation
+    results, used_metrics, schema, avg_metrics = eval_engine.evaluate()
     
-    # print("\nEvaluation results with custom and system metrics:")
-    # print(f"Used metrics: {[getattr(m, 'name', str(m)) for m in used_metrics]}")
-    # print("\nAverage metrics:")
-    # print(json.dumps(avg_metrics, indent=2))
+    print("\nEvaluation results with custom and system metrics:")
+    print(f"Used metrics: {[getattr(m, 'name', str(m)) for m in used_metrics]}")
+    print("\nAverage metrics:")
+    print(json.dumps(avg_metrics, indent=2))
     
-    # print("\nSample results (first data point):")
-    # print(json.dumps(results[0], indent=2))
+    print("\nSample results (first data point):")
+    print(json.dumps(results[0], indent=2))
     
+    # Agentic eval example
     data = {
         "questions": ["What is the price of copper?", "What is the price of gold?"],
         "agent_responses": [["The current price of copper is $0.0098 per gram."], ["The current price of gold is $88.16 per gram."]],
