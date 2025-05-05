@@ -48,7 +48,8 @@ class Experiment:
         if self.options.langgraph:
             # log_lang_stream()
             logs = get_langgraph_logs()
-            engine = AgentValidationEngine(langgraph_logs=logs, reference_tool_calls=self.dataset.reference_tool_calls, gt_answers=self.dataset.gt_answers, gt_tool_outputs=self.dataset.gt_tool_outputs)
+            _gt_answers = [self.dataset.gt_answers[i][0] for i in range(len(self.dataset.gt_answers))]
+            engine = AgentValidationEngine(langgraph_logs=logs, reference_tool_calls=self.dataset.reference_tool_calls, gt_answers=_gt_answers, gt_tool_outputs=self.dataset.gt_tool_outputs)
             self.output, self.metrics, self.avg_metrics = engine.evaluate()
         
         # Create validation engine and run evaluation
