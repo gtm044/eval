@@ -1,7 +1,7 @@
 # src/evaluator/validation.py
 from src.data.dataset import EvalDataset
 from datasets import Dataset
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict, Callable
 import json
 import pandas as pd
 import os
@@ -13,6 +13,7 @@ from ragas.llms import LangchainLLMWrapper
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from ragas.metrics.base import Metric
 from tqdm import tqdm
+import inspect
 
 
 class ValidationEngine:
@@ -24,8 +25,6 @@ class ValidationEngine:
         rubrics: Optional[List[str]] = None,
     ):
         """
-        Initialize the ValidationEngine with dataset and validation options.
-        
         Args:
             dataset: The dataset containing questions, answers, responses, and contexts
             metrics: List of metrics to evaluate
@@ -36,129 +35,169 @@ class ValidationEngine:
         self.segments = segments
         self.rubrics = rubrics
     
-    def evaluate(self):
+    
+    def is_ragas_metric(self, metric):
         """
-        Calculate RAGAS metrics for the evaluation dataset.
-        
-        Returns:
-            tuple: (results_dict, metrics_list, json_schema)
-        """ 
-        # Prepare dataset for single-turn evaluation
+        Determine if a metric is a RAGAS metric or a custom metric.
+        """
+        if hasattr(metric, 'score_batch'): # Common ragas attributes
+            return True
+        if hasattr(metric, '__module__') and metric.__module__.startswith('ragas.'):
+            return True
+        if callable(metric):
+            return False            
+        return True
+    
+    
+    def prepare_dataset(self):
+        """
+        Prepare a format suitable for both RAGAS and custom metrics.
+        """
         dataset_dict = {}
         
         if self.dataset.questions is not None:
             dataset_dict["question"] = self.dataset.questions
-        
         if self.dataset.responses is not None:
             dataset_dict["answer"] = self.dataset.responses
-        
         if self.dataset.retrieved_contexts is not None:
             dataset_dict["contexts"] = self.dataset.retrieved_contexts
-        
         if self.dataset.answers is not None:
             dataset_dict["ground_truths"] = self.dataset.answers
-        
         if self.dataset.reference_contexts is not None:
             dataset_dict["reference"] = self.dataset.reference_contexts
-        
         golden_dataset = Dataset.from_dict(dataset_dict)
-        
-        avg_chunk_size_result = None
-        context_similarity_result = None
-        context_score_result = None
-        llm_grading_result = None
-        
-        self.temp_metrics = self.metrics.copy()
-                    
-        # Check if the custom metrics are present, if so calculate the metrics and remove them from the list
-        if self.metrics:
-            # Create a list to track metrics to remove
-            metrics_to_remove = []
-            
-            # TO-DO: Metrics to remove, filtering out just the ragas metrics - need to make this dynamic
-            for i, metric in enumerate(self.metrics):
-                if metric.name == "avg_chunk_size":
-                    metrics_to_remove.append(i)
-                    print("Calculating average chunk size...")
-                    avg_chunk_size_result = avg_chunk_size([context for context in tqdm(self.dataset.reference_contexts, desc="Processing chunks")])
-                elif metric.name == "context_similarity":
-                    metrics_to_remove.append(i)
-                    print("Calculating context similarity...")
-                    context_similarity_result = context_similarity(self.dataset.reference_contexts, self.dataset.retrieved_contexts)
-                elif metric.name == "context_score":
-                    metrics_to_remove.append(i)
-                    print("Calculating context score...")
-                    context_score_result = context_score(self.dataset.reference_contexts, self.dataset.retrieved_contexts)
-                elif metric.name == "llm_grading":
-                    metrics_to_remove.append(i)
-                    print("Calculating llm grading...")
-                    prime_answers = [answer_list[0] for answer_list in self.dataset.answers] if self.dataset.answers else []
-                    llm_grading_result = llm_grading(queries=self.dataset.questions, ground_truths=prime_answers, model_answers=self.dataset.responses, rubrics=self.rubrics)
-                    
-            # Remove metrics in reverse order to avoid index shifting
-            for i in sorted(metrics_to_remove, reverse=True):
-                self.temp_metrics.pop(i)
-            
-            if len(self.temp_metrics)>0:
-                results = ragas.evaluate(dataset=golden_dataset, metrics=self.temp_metrics, show_progress=True)
-            # Fix this headache, if ragas metrics are not provided then we dont have a results object, can we create a ragas result object with nothing?
-            else:
-                # Create a pandas dataframe with the same structure as the results dataframe
-                results = pd.DataFrame(columns=["user_input", "retrieved_contexts", "response", "reference"])
-                results["user_input"] = self.dataset.questions
-                results["retrieved_contexts"] = self.dataset.retrieved_contexts
-                results["response"] = self.dataset.responses
-                results["reference"] = self.dataset.reference_contexts
-        else:
-            # Try to evaluate with default metrics, but handle errors for incompatible metrics
+        return golden_dataset, dataset_dict
+    
+    
+    def process_custom_metric(self, metric):
+        """
+        Run the evaluation on the custom metrics from the list of metrics.
+        Args:
+            metric: The custom metric to process
+        Returns:
+            tuple: (metric_name, result)
+        """
+        # Get the function params from the signature
+        if callable(metric):
             try:
-                results = ragas.evaluate(dataset=golden_dataset, show_progress=True)
-            except Exception as e:
-                print(f"Error with default metrics: {e}")
-                # Determine applicable metrics based on available dataset fields
-                applicable_metrics = []
+                sig = inspect.signature(metric)
+                param_names = list(sig.parameters.keys())
                 
-                if "contexts" in dataset_dict and "question" in dataset_dict and "answer" in dataset_dict:
-                    applicable_metrics.extend([answer_relevancy, faithfulness])
+                # Mapping the params to our attributes in the evaluation datset
+                kwargs = {}
+                param_mapping = {
+                    "questions": self.dataset.questions,
+                    "queries": self.dataset.questions,
+                    "reference_contexts": self.dataset.reference_contexts,
+                    "retrieved_contexts": self.dataset.retrieved_contexts,
+                    "contexts": self.dataset.retrieved_contexts,
+                    "responses": self.dataset.responses,
+                    "model_answers": self.dataset.responses,
+                    "answer": self.dataset.responses,
+                    "ground_truths": self.dataset.answers,
+                    "answers": self.dataset.answers,
+                    "rubrics": self.rubrics
+                }
                 
-                if "ground_truths" in dataset_dict and "answer" in dataset_dict and "question" in dataset_dict:
-                    applicable_metrics.extend([answer_correctness, answer_similarity])
-                
-                if "question" in dataset_dict and "reference" in dataset_dict and "contexts" in dataset_dict:
-                    applicable_metrics.extend([context_recall, context_precision])
-                
-                if not applicable_metrics:
-                    raise ValueError("No applicable metrics found for the provided dataset")
-                
-                print(f"Evaluating with applicable metrics: {[m.name for m in applicable_metrics]}")
-                results = ragas.evaluate(dataset=golden_dataset, metrics=applicable_metrics, show_progress=True)
-        
+                # For llm grading, we need the first answer from each list, 
+                # Todo: integrate multiple answers for the llm grading
+                if metric.__name__ == "llm_grading" and self.dataset.answers:
+                    param_mapping["ground_truths"] = [answer_list[0] for answer_list in self.dataset.answers] if self.dataset.answers else []
 
-        # Convert to pandas DataFrame if results is not of type dataframe
-        df = results.to_pandas() if not isinstance(results, pd.DataFrame) else results
-        
-        additional_fields = {
-            "ground_truth_answer": self.dataset.answers,
-            "avg_chunk_size": avg_chunk_size_result,
-            "context_similarity": context_similarity_result,
-            "context_score": context_score_result,
-            "llm_grading": llm_grading_result
-        }
-        
-        for item, value in additional_fields.items():
-            if value is not None:
-                df[item] = value
+                for param in param_names:
+                    if param in param_mapping and param_mapping[param] is not None:
+                        kwargs[param] = param_mapping[param]
+                metric_name = metric.name if hasattr(metric, 'name') else metric.__name__
+                print(f"Calculating {metric_name}...")
+                
+                # Call the metric function with the appropriate parameters
+                result = metric(**kwargs)
+                return metric_name, result
+            except Exception as e:
+                print(f"Error calculating {getattr(metric, 'name', metric.__name__)}: {e}")
+                
+        return None, None
+    
+    
+    def process_ragas_metrics(self, metrics, golden_dataset):
+        """
+        Run the evaluation on the RAGAS metrics.       
+        Args:
+            metrics: List of RAGAS metrics to evaluate
+            golden_dataset: The prepared dataset for evaluation
             
-        # Create results directory if it doesn't exist, save 
+        Returns:
+            pandas.DataFrame containing the results.
+        """
+        print(f"Evaluating with RAGAS metrics: {[getattr(m, 'name', str(m)) for m in metrics]}")
+        try:
+            results = ragas.evaluate(dataset=golden_dataset, metrics=metrics, show_progress=True)
+            return results.to_pandas()
+        except Exception as e:
+            print(f"Error in RAGAS evaluation: {e}")
+            return self.create_empty_dataframe()
+    
+    
+    def create_empty_dataframe(self):
+        """
+        Create an empty df with the required attributes (if there are no RAGAS metrics).
+        Returns:
+            pandas.DataFrame: Empty dataframe with appropriate columns
+        """
+        df = pd.DataFrame(columns=["user_input", "retrieved_contexts", "response", "reference"])
+        if self.dataset.questions:
+            df["user_input"] = self.dataset.questions
+        if self.dataset.retrieved_contexts:
+            df["retrieved_contexts"] = self.dataset.retrieved_contexts
+        if self.dataset.responses:
+            df["response"] = self.dataset.responses
+        if self.dataset.reference_contexts:
+            df["reference"] = self.dataset.reference_contexts
+        return df
+    
+    
+    def determine_applicable_metrics(self, dataset_dict):
+        """
+        Determine applicable metrics based on available dataset fields if no metrics are provided.
+        Args:
+            dataset_dict: Dictionary containing dataset fields
+        Returns:
+            list: List of applicable metrics
+        """
+        applicable_metrics = []
+        if "contexts" in dataset_dict and "question" in dataset_dict and "answer" in dataset_dict:
+            applicable_metrics.extend([answer_relevancy])
+        
+        if "ground_truths" in dataset_dict and "answer" in dataset_dict and "question" in dataset_dict:
+            applicable_metrics.extend([answer_correctness, answer_similarity])
+        
+        if "question" in dataset_dict and "reference" in dataset_dict and "contexts" in dataset_dict:
+            applicable_metrics.extend([context_recall, context_precision])
+        
+        if not applicable_metrics:
+            raise ValueError("No applicable metrics found for the provided dataset")
+        return applicable_metrics
+    
+    
+    def save_results(self, df):
+        """
+        Generate and save results to CSV and JSON files.
+        Args:
+            df: DataFrame containing evaluation results
+        Returns:
+            tuple: (results_dict, json_schema) - Dictionary of results and JSON schema
+        """
+        # Create results directory
         results_dir = ".results"
         os.makedirs(results_dir, exist_ok=True)
+        # Save to CSV
         csv_filename = os.path.join(results_dir, "results.csv")
         df.to_csv(csv_filename, index=False)
+        # Save to JSON
         results_dict = df.to_dict(orient='records')
         json_filename = os.path.join(results_dir, "results.json")
         with open(json_filename, "w") as f:
             json.dump(results_dict, f, indent=4)
-        
         # Create JSON schema
         json_schema = {
             "type": "array",
@@ -171,47 +210,151 @@ class ValidationEngine:
             json_schema["items"]["properties"][column] = {
                 "type": "number" if df[column].dtype in ['float64', 'int64'] else "string",
             }
-            
-        # Metircs averages
-        avg_metrics = {}
-        if self.metrics:
-            for metric in self.metrics:
-                if metric.name in df.columns:
-                    avg_metrics[metric.name] = df[metric.name].mean()
-        else:
-            for metric in applicable_metrics:
-                if metric.name in df.columns:
-                    avg_metrics[metric.name] = df[metric.name].mean()
         
         print(f"Results saved to {csv_filename} and {json_filename}")
+        return results_dict, json_schema
+    
+    
+    def calculate_average_metrics(self, df, metrics):
+        """
+        Calculate the average of each metric in the results.
+        Args:
+            df: DataFrame containing evaluation results
+            metrics: List of metrics used in evaluation
+            
+        Returns:
+            dict: Dictionary of average metric values
+        """
+        avg_metrics = {}
+        for metric in metrics:
+            metric_name = getattr(metric, 'name', str(metric))
+            if metric_name in df.columns:
+                avg_metrics[metric_name] = df[metric_name].mean()
+        
+        return avg_metrics
+            
+            
+    def evaluate(self):
+        """
+        Calculate metrics for the evaluation dataset.
+        Returns:
+            tuple: (results_dict, metrics_list, json_schema, avg_metrics)
+        """
+        # Prepare the dataset
+        golden_dataset, dataset_dict = self.prepare_dataset()
+        custom_metric_results = {}
+        ragas_metrics = []
+                    
+        # Process metrics if provided
         if self.metrics:
-            return results_dict, self.metrics, json_schema, avg_metrics
+            # Dynamically separate RAGAS metrics from custom metrics
+            for metric in self.metrics:
+                if not self.is_ragas_metric(metric):
+                    print(f"Processing custom metric: {metric.name if hasattr(metric, 'name') else metric.__name__}")
+                    metric_name, result = self.process_custom_metric(metric)
+                    if metric_name and result is not None:
+                        custom_metric_results[metric_name] = result
+                else:
+                    ragas_metrics.append(metric)
+            
+            # Process RAGAS metrics if there are any
+            if ragas_metrics:
+                df = self.process_ragas_metrics(ragas_metrics, golden_dataset)
+            else:
+                df = self.create_empty_dataframe()
         else:
-            return results_dict, applicable_metrics, json_schema, avg_metrics
+            # Try to evaluate with default metrics
+            try:
+                results = ragas.evaluate(dataset=golden_dataset, show_progress=True)
+                df = results.to_pandas()
+            except Exception as e:
+                print(f"Error with default metrics: {e}")
+                # Determine applicable metrics based on available dataset fields
+                applicable_metrics = self.determine_applicable_metrics(dataset_dict)
+                
+                print(f"Evaluating with applicable metrics: {[m.name for m in applicable_metrics]}")
+                df = self.process_ragas_metrics(applicable_metrics, golden_dataset)
+                # Update metrics list to applicable metrics for return value
+                self.metrics = applicable_metrics
+        
+        # Add custom metric results to the DataFrame
+        for metric_name, metric_result in custom_metric_results.items():
+            df[metric_name] = metric_result
+        # Add ground truth answers to the DataFrame if they exist
+        if self.dataset.answers:
+            df["ground_truth_answer"] = self.dataset.answers
+        
+        # Save results and get results dict and schema
+        results_dict, json_schema = self.save_results(df)
+        
+        # Calculate average metrics
+        metric_list = self.metrics if self.metrics else applicable_metrics
+        avg_metrics = self.calculate_average_metrics(df, metric_list)
+        
+        return results_dict, metric_list, json_schema, avg_metrics
+        
         
 if __name__=='__main__':
-    # Example usage of ValidationEngine
+    # Example
     data = {
         "questions": ["What is the capital of France?", "Who is the president of the USA?"],
         "answers": [["Paris", "France"], ["Joe Biden", "USA"]],
         "responses": ["Capital of france is Paris", "President of the USA is Joe Biden"],
-        "reference_contexts": ["Paris", "Joe Biden"],
-        "retrieved_contexts": [["Paris", "France"], ["Joe Biden", "USA"]]
+        "reference_contexts": ["Paris is the capital of France", "Joe Biden is the 46th president of the USA"],
+        "retrieved_contexts": [["Paris is the capital of France", "France is in Europe"], ["Joe Biden is the 46th president of the USA", "The USA is a country in North America"]]
     }
     _dataset = EvalDataset(**data)
     
-    # Single-turn evaluation
-    # metrics = [context_precision, context_recall, answer_relevancy, faithfulness, answer_correctness, avg_chunk_size, context_similarity, context_score]
-    metrics = [llm_grading]
-    eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics) # Dont provide metrics if you want to use the default metrics
-    results, metrics, schema, avg_metrics = eval_engine.evaluate()
-    print("Single-turn evaluation results:")
-    print(json.dumps(results, indent=2))
-    print("JSON Schema:")
-    print(json.dumps(schema, indent=2))
-    print("Average metrics:")
+    # Define custom metric functions
+    def response_length(responses):
+        """
+        Custom metric that calculates the length of each response
+        """
+        print("Calculating response length...")
+        response_lengths = [len(response) for response in responses]
+        return response_lengths
+    
+    def context_to_response_ratio(responses, retrieved_contexts):
+        """
+        Custom metric that calculates the ratio of context length to response length
+        """
+        print("Calculating context to response ratio...")
+        ratios = []
+        for i, response in enumerate(responses):
+            if i < len(retrieved_contexts):
+                # Calculate total length of all contexts for this response
+                total_context_length = sum(len(ctx) for ctx in retrieved_contexts[i])
+                response_length = len(response)
+                ratio = total_context_length / response_length if response_length > 0 else 0
+                ratios.append(ratio)
+            else:
+                ratios.append(0)
+        return ratios
+
+    
+    metrics = [
+        # Custom metrics
+        response_length,
+        context_to_response_ratio,
+        # System-implemented metrics that work reliably (not RAGAS metrics)
+        context_similarity,
+        context_score,
+        # Ragas metrics
+        answer_correctness,
+        answer_similarity,
+        answer_relevancy,
+    ]
+    
+    # Create the validation engine with the metrics
+    eval_engine = ValidationEngine(dataset=_dataset, metrics=metrics)
+    
+    # Run the evaluation
+    results, used_metrics, schema, avg_metrics = eval_engine.evaluate()
+    
+    print("\nEvaluation results with custom and system metrics:")
+    print(f"Used metrics: {[getattr(m, 'name', str(m)) for m in used_metrics]}")
+    print("\nAverage metrics:")
     print(json.dumps(avg_metrics, indent=2))
     
-    ## Note: The avg_chunk_size will be the same for all data points as it is a normalized index. 
-    ## Ranges from -inf to 1 (Higher is better)
-    ## Any score above 0.5 is acceptable.
+    print("\nSample results (first data point):")
+    print(json.dumps(results[0], indent=2))
