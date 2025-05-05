@@ -11,7 +11,7 @@ from src.utils.models import openai_embedding
 from src.utils.nlp import cosine_similarity
 from src.utils.models import llm_as_a_judge
 
-def tool_call_accuracy(tool_calls: List[List[Any]], reference_tool_calls: List[List[Dict[str, Any]]]) -> float:
+def tool_call_accuracy(agent_tool_calls: List[List[Any]], reference_tool_calls: List[List[Dict[str, Any]]]) -> float:
     """Calculate tool call accuracy with more precise targeting of semantic matching."""
     
     # Define tool-specific semantic matching rules
@@ -31,7 +31,7 @@ def tool_call_accuracy(tool_calls: List[List[Any]], reference_tool_calls: List[L
     MIN_LENGTH = 10
     
     tool_call_accuracy = []
-    for i, (agent_calls, ref_calls) in enumerate(zip(tool_calls, reference_tool_calls)):
+    for i, (agent_calls, ref_calls) in enumerate(zip(agent_tool_calls, reference_tool_calls)):
         conv_accuracy = 0.0
         if agent_calls and ref_calls:
             matches = 0
@@ -140,7 +140,7 @@ def answer_faithfulness(ai_messages: List[List[Any]], tool_outputs: List[List[st
 #     return tool_correctness
 
 
-def tool_accuracy(tool_outputs: List[List[str]], gt_tool_outputs: List[List[str]]) -> float:
+def tool_accuracy(agent_tool_outputs: List[List[str]], gt_tool_outputs: List[List[str]]) -> float:
     """Calculate tool accuracy.
     
     Args:
@@ -150,13 +150,13 @@ def tool_accuracy(tool_outputs: List[List[str]], gt_tool_outputs: List[List[str]
         float: Tool accuracy
     """
     tool_accuracy = []
-    for i, (tool_output, gt_output) in enumerate(zip(tool_outputs, gt_tool_outputs)):
+    for i, (agent_tool_output, gt_tool_output) in enumerate(zip(agent_tool_outputs, gt_tool_outputs)):
         # Basic string matching implementationnas of now, need to find something more relevant
         #Cosine similarity -> bw the ground truth tool output and the tool output
-        if tool_output and gt_output:
+        if agent_tool_output and gt_tool_output:
             # Calculate cosine similarity between tool outputs and ground truth
             similarities = []
-            for a, b in zip(tool_output, gt_output):
+            for a, b in zip(agent_tool_output, gt_tool_output):
                 # Convert to string if not already
                 a_str = str(a)
                 b_str = str(b)
