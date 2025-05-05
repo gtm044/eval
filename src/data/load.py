@@ -108,6 +108,18 @@ class LoadOperator:
         if content[0]["retrieved_contexts"]:    
             output_dict["retrieved_contexts"] = [c["retrieved_contexts"] for c in content]
         
+        if content[0]["agent_responses"]:
+            output_dict["agent_responses"] = [c["agent_responses"] for c in content]
+        if content[0]["agent_tool_calls"]:
+            output_dict["agent_tool_calls"] = [c["agent_tool_calls"] for c in content]
+        if content[0]["agent_tool_outputs"]:
+            output_dict["agent_tool_outputs"] = [c["agent_tool_outputs"] for c in content]
+        if content[0]["reference_tool_calls"]:
+            output_dict["reference_tool_calls"] = [c["reference_tool_calls"] for c in content]
+        if content[0]["gt_answers"]:
+            output_dict["gt_answers"] = [c["gt_answers"] for c in content]
+        if content[0]["gt_tool_outputs"]:
+            output_dict["gt_tool_outputs"] = [c["gt_tool_outputs"] for c in content]
         
         return EvalDataset(dataset_id=dataset_id, **output_dict)
         
@@ -160,18 +172,42 @@ class LoadOperator:
 
     
 if __name__ == '__main__':
+    # data = {
+    #     "questions": ["What is the capital of France?", "Who is the president of the USA?"],
+    #     "answers": [["Paris", "France"], ["Washington", "USA"]],
+    #     "responses": ["Paris", "Joe Biden"],
+    #     "reference_contexts": ["Paris is the capital of France", "The USA is a country in North America"],
+    #     "retrieved_contexts": [["Paris is the capital of France", "France is a country in Europe"], ["Washington is the capital of the USA", "The USA is a country in North America"]]
+    # }
+    # dataset = EvalDataset(**data)
+    # dataset.to_json("test.json")
+    # loader = LoadOperator(dataset=dataset, dataset_description="Test dataset")
+    # loader.load_docs()
+    # print(dataset.dataset_id)
+    # # Instantiate a new loader to retrieve the documents
+    # retriever = LoadOperator() # No arguments for the retriever load operator
+    # print(retriever.retrieve_docs(dataset_id=dataset.dataset_id))
+    
+    # Agentic dataset example
     data = {
-        "questions": ["What is the capital of France?", "Who is the president of the USA?"],
-        "answers": [["Paris", "France"], ["Washington", "USA"]],
-        "responses": ["Paris", "Joe Biden"],
-        "reference_contexts": ["Paris is the capital of France", "The USA is a country in North America"],
-        "retrieved_contexts": [["Paris is the capital of France", "France is a country in Europe"], ["Washington is the capital of the USA", "The USA is a country in North America"]]
+        "questions": ["What is the price of copper?", "What is the price of gold?"],
+        "agent_responses": [["The current price of copper is $0.0098 per gram."], ["The current price of gold is $88.16 per gram."]],
+        "agent_tool_calls": [
+            [{"name": "get_price", "args": {"item": "copper"}}],
+            [{"name": "get_price", "args": {"item": "gold"}}]
+        ],
+        "agent_tool_outputs": [["$0.0098"], ["$88.16"]],
+        "reference_tool_calls": [
+            [{"name": "get_price", "args": {"item": "copper"}}],
+            [{"name": "get_price", "args": {"item": "gold"}}]
+        ],
+        "gt_answers": [["$0.0098 per gram"], ["$88.16 per gram"]],
+        "gt_tool_outputs": [["$0.0098"], ["$88.16"]]
     }
     dataset = EvalDataset(**data)
-    dataset.to_json("test.json")
-    loader = LoadOperator(dataset=dataset, dataset_description="Test dataset")
+    print(dataset)
+    # print(dataset.to_json(filename="test_agentic.json"))
+    
+    loader = LoadOperator(dataset=dataset, dataset_description="Test agentic dataset")
     loader.load_docs()
     print(dataset.dataset_id)
-    # Instantiate a new loader to retrieve the documents
-    retriever = LoadOperator() # No arguments for the retriever load operator
-    print(retriever.retrieve_docs(dataset_id=dataset.dataset_id))

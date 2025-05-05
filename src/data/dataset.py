@@ -175,18 +175,16 @@ class EvalDataset(BaseModel):
             
         return cls(**dataset_dict)
     
-    # Checks that all input lists are of the same length
+    # Checks that all input lists are of the same length (for the RAG part)
     @field_validator("questions", "answers", "responses", "reference_contexts", "retrieved_contexts", mode="before")
     @classmethod
     def validate_length(cls, v, info):
         data = info.data  
-        # Filter out None fields
         filtered_data = {field: data[field] for field in {"questions", "answers", "responses", "reference_contexts", "retrieved_contexts"} if field in data and data[field] is not None}
         error_message = ""
         for field, value in filtered_data.items():
             error_message += f"{field}: {len(value)}\n"
         if filtered_data:
-            # Get the length of each field, accounting for answers and retrieved_contexts being lists of lists
             lengths = []
             for field, value in filtered_data.items():
                 lengths.append(len(value))
@@ -197,6 +195,8 @@ class EvalDataset(BaseModel):
     
     
 if __name__ == '__main__':
+    
+    ## RAG/General AI pipeline example
     # data = {
     #     "questions": ["What is the capital of France?", "Who is the president of the USA?"],
     #     "answers": [["Paris", "France"], ["Washington", "USA"]],
