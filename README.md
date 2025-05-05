@@ -68,13 +68,13 @@ The framework uses environment variables for Couchbase and OpenAI configurations
 
 ## Usage
 
-A complete workflow example provided in [`example.ipynb`](examples/rag_eval.ipynb)
+A complete workflow example for a RAG use case provided in [`example.ipynb`](examples/rag_eval.ipynb)
 
 ### Synthetic Data Generation
 
 The framework provides tools to generate synthetic question-answer pairs from your documents, which can be used as ground truth for evaluation. <span style="color:yellow">For json and csv documents, provide detailed metadata including the dataset schema for accurate data generation.</span>
 
-For generation and perf logging for the single-hop generator (memory and runtime):
+For generation and performance stats for the single-hop generator (memory and runtime):
 ~~~sh
 ~$ python3 -m src.data.generator --path <path to the csv/json file> --metadata-file <path to metadata txt file> --field <field name in json to use (optional)> --limit <limit number of rows to process (optional)> --format <file format ('csv' or 'json')>
 ~~~
@@ -150,7 +150,7 @@ for question, answer, context in zip(questions, answers, reference_contexts):
 
 ```
 
-### Basic Evaluation
+### Basic Evaluation for RAG/Basic AI Pipeline
 
 ```python
 from eval.src.data.dataset import EvalDataset
@@ -174,7 +174,41 @@ engine = ValidationEngine(
 )
 results = engine.evaluate()
 ```
-Results are stored in folder named `.results`
+
+### Basic Evaluation for Agentic Pipeline
+
+```python
+from eval.src.data.dataset import EvalDataset
+from eval.src.evaluator.validation import ValidationEngine
+
+# Create dataset
+dataset = EvalDataset(
+    questions=["What is the price of copper?", "What is the price of gold?"],
+    agent_responses=[["The current price of copper is $0.0098 per gram."], ["The current price of gold is $88.16 per gram."]],
+    agent_tool_calls=[
+        [{"name": "get_price", "args": {"item": "copper"}}],
+        [{"name": "get_price", "args": {"item": "gold"}}]
+    ],
+    agent_tool_outputs=[["$0.0098"], ["$88.16"]],
+    reference_tool_calls=[
+        [{"name": "get_price", "args": {"item": "copper"}}],    
+        [{"name": "get_price", "args": {"item": "gold"}}]
+    ],
+    gt_answers=[["$0.0098 per gram"], ["$88.16 per gram"]],
+    gt_tool_outputs=[["$0.0098"], ["$88.16"]]
+)
+
+# Run evaluation with metrics
+from eval.src.evaluator.metrics import tool_call_accuracy, tool_accuracy, agent_response_correctness
+
+engine = ValidationEngine(
+    dataset=dataset,
+    metrics=[tool_call_accuracy, tool_accuracy, agent_response_correctness]
+)
+results, metrics_used, schema, avg_metrics = engine.evaluate() 
+```
+
+Results are stored in `.results` folder in the current working directory.
 
 ### Experiment based evaluation
 
@@ -186,12 +220,12 @@ from eval.src.controller.manager import Experiment
 experiment_options = ExperimentOptions(
     experiment_id="exp_001",
     dataset_id="dataset_001",
-    metrics=[context_precision, context_recall, faithfulness],
-    chunk_size=100,
-    chunk_overlap=20,
+    metrics=[tool_call_accuracy, tool_accuracy, agent_response_correctness],
     embedding_model="text-embedding-3-large",
     embedding_dimension=3072,
-    llm_model="gpt-4"
+    llm_model="gpt-4o",
+    experiment_description="Experiment for agentic evaluation",
+    # Can add more fields as required...
 )
 
 # Create experiment, results are stored
@@ -201,13 +235,13 @@ experiment = Experiment(dataset=dataset, options=experiment_options) #Pulls the 
 experiment.load_to_couchbase()
 
 # Retrieve experiment results from the couchbase kv store
-experiment_result = Experiment().retrieve(experiment_id="exp_001")
+experiment_result = Experiment().retrieve(experiment_id="exp_001", collection="results")
 ```
 Results are stored in `.results-<experiment_id>`
 
-### Agent Evaluation
+### Agent Evaluation with LangGraph
 
-Example provided in [`agent_langgraph_improved.py`](examples/agent_langgraph_improved.py)
+Example provided in [`langgraph_eval.py`](examples/agent_langgraph_improved.py)
 
 ### Tracing LangGraph and LangChain
 

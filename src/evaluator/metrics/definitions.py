@@ -6,7 +6,7 @@ from src.evaluator.metrics.chunking import avg_chunk_size
 from src.evaluator.metrics.retrieval import context_similarity, context_score, named_entity_score
 # from src.evaluator.metrics.generation import llm_grading, factual_consistency_faithfulness, hybrid_faithfulness, contradiction_faithfulness
 from src.evaluator.metrics.generation import llm_grading
-from src.evaluator.metrics.agentic import tool_call_accuracy, tool_accuracy
+from src.evaluator.metrics.agentic import tool_call_accuracy, tool_accuracy, agent_response_correctness
 
 # Original Ragas metrics
 faithfulness = faithfulness
@@ -24,6 +24,7 @@ named_entity_score = named_entity_score
 llm_grading = llm_grading
 tool_call_accuracy = tool_call_accuracy
 tool_accuracy = tool_accuracy
+agent_response_correctness = agent_response_correctness
 # # New Advanced Faithfulness Metrics (ToDo; Unit tests for these)
 # factual_consistency_faithfulness = factual_consistency_faithfulness
 # hybrid_faithfulness = hybrid_faithfulness

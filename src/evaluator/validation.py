@@ -7,7 +7,7 @@ import pandas as pd
 import os
 import ragas
 from ragas import evaluate
-from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity, context_similarity, context_score, llm_grading, tool_call_accuracy, tool_accuracy
+from src.evaluator.metrics import faithfulness, answer_relevancy, context_recall, context_precision, answer_correctness, avg_chunk_size, answer_similarity, context_similarity, context_score, llm_grading, tool_call_accuracy, tool_accuracy, agent_response_correctness
 
 from ragas.embeddings import LangchainEmbeddingsWrapper
 from ragas.llms import LangchainLLMWrapper
@@ -411,7 +411,7 @@ if __name__=='__main__':
         "gt_tool_outputs": [["$0.0098"], ["$88.16"]]
     }
     dataset = EvalDataset(**data)
-    metrics = [tool_call_accuracy, tool_accuracy]
+    metrics = [tool_call_accuracy, tool_accuracy, agent_response_correctness]
     eval_engine = ValidationEngine(dataset=dataset, metrics=metrics)
     results, used_metrics, schema, avg_metrics = eval_engine.evaluate()
     print(results)

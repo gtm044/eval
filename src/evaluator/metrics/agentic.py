@@ -82,13 +82,10 @@ def tool_call_accuracy(agent_tool_calls: List[List[Any]], reference_tool_calls: 
     return tool_call_accuracy
     
 
-
 def answer_correctness(ai_messages: List[List[Any]], gt_answers: List[str]) -> float:
     """Calculate answer correctness.
-    
     Args:
         langgraph_logs: List of lists of dictionaries containing conversation logs
-
     Returns:
         float: Answer correctness
     """
@@ -101,13 +98,49 @@ def answer_correctness(ai_messages: List[List[Any]], gt_answers: List[str]) -> f
             answer_correctness.append(round(match_score.item(), 2))
     return answer_correctness
 
+## Couple of new metrics to be added:
+# 1. One for comparing the agent responses (n number of responses) with the gt agent responses
+# 2. One for comparing the agent responses with the question and the tool outputs to get the overall_target_score or something like that
+
+def agent_response_correctness(agent_responses: List[List[Any]], gt_agent_responses: List[List[Any]]) -> float:
+    """Calculate agent response correctness -> semantic similarity between agent responses and gt agent responses and penalty for message length mismatch.
+    Args:
+        langgraph_logs: List of lists of dictionaries containing conversation logs
+    Returns:
+        float: Agent response correctness
+    """
+    conversation_scores = []
+    for agent_conv, gt_conv in zip(agent_responses, gt_agent_responses):
+        turn_scores = []
+        num_turns_match = min(len(agent_conv), len(gt_conv))
+        if num_turns_match == 0:
+            conversation_scores.append(0.0)
+            continue
+        for i in range(num_turns_match):
+            agent_msg = str(agent_conv[i])
+            gt_msg = str(gt_conv[i])
+            if not agent_msg or not gt_msg:
+                turn_scores.append(0.0)
+                continue
+            # agent_embedding = openai_embedding(agent_msg)
+            # gt_embedding = openai_embedding(gt_msg)
+            # similarity = cosine_similarity(agent_embedding, gt_embedding)
+            # turn_scores.append(round(similarity.item(), 2))
+            # Use BERTScore instead of cosine similarity
+            from bert_score import score
+            P, R, F1 = score([agent_msg], [gt_msg], lang="en", verbose=False)
+            # Use F1 score as the similarity measure
+            similarity = F1.item()
+            turn_scores.append(round(similarity, 2))
+        conversation_scores.append(sum(turn_scores) / num_turns_match)
+    return conversation_scores
+    
+
 
 def answer_faithfulness(ai_messages: List[List[Any]], tool_outputs: List[List[str]]) -> float:
     """Calculate answer faithfulness.
-    
     Args:
         langgraph_logs: List of lists of dictionaries containing conversation logs
-
     Returns:
         float: Answer faithfulness
     """
@@ -157,11 +190,9 @@ def tool_accuracy(agent_tool_outputs: List[List[str]], gt_tool_outputs: List[Lis
             # Calculate cosine similarity between tool outputs and ground truth
             similarities = []
             for a, b in zip(agent_tool_output, gt_tool_output):
-                # Convert to string if not already
                 a_str = str(a)
                 b_str = str(b)
                 
-                # Get embeddings
                 a_embedding = openai_embedding(a_str)
                 b_embedding = openai_embedding(b_str)
                 
@@ -179,6 +210,7 @@ tool_call_accuracy.name = "tool_call_accuracy"
 answer_correctness.name = "answer_correctness"
 answer_faithfulness.name = "answer_faithfulness"
 tool_accuracy.name = "tool_accuracy"
+agent_response_correctness.name = "agent_response_correctness"
 
 if __name__=='__main__':
     # Example data for testing metrics
