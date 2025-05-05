@@ -149,8 +149,8 @@ for question, answer, context in zip(questions, answers, reference_contexts):
     print("---")
 
 ```
-
-### Basic Evaluation for RAG/Basic AI Pipeline
+---
+### Basic Evaluation for a RAG system or simple AI pipeline
 
 ```python
 from eval.src.data.dataset import EvalDataset
@@ -174,8 +174,8 @@ engine = ValidationEngine(
 )
 results = engine.evaluate()
 ```
-
-### Basic Evaluation for Agentic Pipeline
+---
+### Basic Evaluation for an Agentic System
 
 ```python
 from eval.src.data.dataset import EvalDataset
@@ -210,6 +210,7 @@ results, metrics_used, schema, avg_metrics = engine.evaluate()
 
 Results are stored in `.results` folder in the current working directory.
 
+---
 ### Experiment based evaluation
 
 ```python
@@ -239,10 +240,42 @@ experiment_result = Experiment().retrieve(experiment_id="exp_001", collection="r
 ```
 Results are stored in `.results-<experiment_id>`
 
+---
+### Adding a custom user defined metric
+Custom metrics can be added as functions to the list of metrics provided to the `ExperimentOptions` object. The functions should follow the below signature:
+```txt
+Arguments should belong to the following list of attributes of the `EvalDataset` object. Each argument is a list of values over the entire dataset and should be present in the `EvalDataset` object: 
+    - questions: List[str]
+    - responses: List[str]
+    - answers: List[List[str]]
+    - reference_contexts: List[str]
+    - retrieved_contexts: List[List[str]]
+    - agent_responses: List[List[str]]
+    - agent_tool_calls: List[List[Dict[str, Any]]]
+    - agent_tool_outputs: List[List[str]]
+    - reference_tool_calls: List[List[Dict[str, Any]]]
+    - gt_answers: List[List[str]]
+    - gt_tool_outputs: List[List[str]]
+Output:
+    - List of metric values (one per data instance evaluated)
+```
+Refer [validation.py](src/evaluator/validation.py) for an example of a custom metric.
+Example dummy metric:
+```python
+# Define the custom metric
+def custom_metric(questions: List[str], responses: List[str]):
+    metric_values = []
+    for question, response in zip(questions, responses):
+        metric_values.append(1 if question == response else 0)
+    return metric_values
+```
+
+---
 ### Agent Evaluation with LangGraph
 
 Example provided in [`langgraph_eval.py`](examples/agent_langgraph_improved.py)
 
+---
 ### Tracing LangGraph and LangChain
 
 ```python
